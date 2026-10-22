@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Bot,
   Building2,
   Calculator,
   CheckCircle2,
@@ -8,12 +9,16 @@ import {
   FileSpreadsheet,
   FileText,
   FolderPlus,
+  KeyRound,
   Layers,
   Play,
   Send,
   ShieldAlert,
+  Sparkles,
   Users,
-  Video
+  Video,
+  X,
+  Zap
 } from 'lucide-react';
 import { SKILLS_CATALOG } from '../data/officeData';
 import { CLOUD_PRINT_QUOTE_URL } from '../utils/printQuoteEngine';
@@ -519,6 +524,25 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                         <div className="text-[11px] text-slate-400 truncate">
                           {ag.departmentLabel}
                         </div>
+                        {(() => {
+                          const agCfg = getAgentModelConfig(ag);
+                          return (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span
+                                className="text-[9px] px-1 py-0.2 rounded font-mono font-semibold"
+                                style={{
+                                  backgroundColor: `${agCfg.badgeColor}20`,
+                                  color: agCfg.badgeColor
+                                }}
+                              >
+                                {agCfg.roleTier === 'ceo' ? '👑 CEO' : agCfg.roleTier === 'manager' ? '👔 Trưởng phòng' : '⚡ Chuyên viên'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 truncate">
+                                {agCfg.modelName}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <div className="text-[11px] text-slate-400 truncate">
                           {ag.roleTitle}
                         </div>
@@ -541,6 +565,26 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     <div className="text-xs text-slate-400">
                       Bộ phận: <strong className="text-slate-200">{selectedAgent.departmentLabel}</strong> · Vị trí 3D: ({selectedAgent.homePosition.x}, {selectedAgent.homePosition.z})
                     </div>
+                    {(() => {
+                      const cfg = getAgentModelConfig(selectedAgent);
+                      return (
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold font-mono border"
+                            style={{
+                              backgroundColor: `${cfg.badgeColor}20`,
+                              borderColor: cfg.badgeColor,
+                              color: cfg.badgeColor
+                            }}
+                          >
+                            {cfg.badgeLabel}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {cfg.description}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -658,14 +702,25 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowCalculator(!showCalculator)}
-                    className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-medium whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    <Calculator className="w-3.5 h-3.5" />
-                    <span>{showCalculator ? 'Đóng tính giá' : 'Tính giá m2'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowAiModelMatrix(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/60 border border-purple-700/60 rounded-md font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    >
+                      <Bot className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Ma trận AI (Free)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCalculator(!showCalculator)}
+                      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-medium whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <Calculator className="w-3.5 h-3.5" />
+                      <span>{showCalculator ? 'Đóng tính giá' : 'Tính giá m2'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {dispatchMode === 'ceo_auto' ? (
@@ -982,9 +1037,46 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                             {selectedTask.report.totalAmountFormatted}
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono text-amber-300">
-                          {selectedTask.report.appliedSopCodes.join(', ')}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[11px] font-mono text-amber-300">
+                            {selectedTask.report.appliedSopCodes.join(', ')}
+                          </span>
+                          {selectedTask.report.providerUsed && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                              style={{
+                                backgroundColor:
+                                  selectedTask.report.roleTierUsed === 'ceo'
+                                    ? '#a855f720'
+                                    : selectedTask.report.roleTierUsed === 'manager'
+                                    ? '#f9731620'
+                                    : '#38bdf820',
+                                borderColor:
+                                  selectedTask.report.roleTierUsed === 'ceo'
+                                    ? '#a855f7'
+                                    : selectedTask.report.roleTierUsed === 'manager'
+                                    ? '#f97316'
+                                    : '#38bdf8',
+                                color:
+                                  selectedTask.report.roleTierUsed === 'ceo'
+                                    ? '#d8b4fe'
+                                    : selectedTask.report.roleTierUsed === 'manager'
+                                    ? '#fdba74'
+                                    : '#7dd3fc'
+                              }}
+                            >
+                              {selectedTask.report.roleTierUsed === 'ceo'
+                                ? '👑 CEO'
+                                : selectedTask.report.roleTierUsed === 'manager'
+                                ? '👔 Manager'
+                                : '⚡ Executive'}
+                              {' • '}
+                              {selectedTask.report.providerUsed === 'local-engine'
+                                ? 'SOP Engine (0đ)'
+                                : `${selectedTask.report.providerUsed}: ${selectedTask.report.modelUsed}`}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -1422,6 +1514,138 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL: AI MULTI-MODEL MATRIX & FREE TIER CONFIGURATION */}
+      {showAiModelMatrix && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ma trận phân quyền mô hình AI và Cấu hình Free Tier"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        >
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950/80">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <Bot className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white font-display">
+                    Ma Trận Phân Quyền Mô Hình AI & Hướng Dẫn Free Tier (0đ)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Cấu hình mô hình thông minh cho 17 nhân sự Doraemon theo 3 cấp bậc (CEO - Manager - Executive)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAiModelMatrix(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              {/* 3 Tier Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* TIER 1: CEO */}
+                <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-purple-300 text-xs">👑 CẤP 1: BAN GIÁM ĐỐC</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-700 font-mono">
+                      CEO Tier
+                    </span>
+                  </div>
+                  <div className="text-white font-semibold">Doraemon (Giám đốc Điều hành)</div>
+                  <div className="text-[11px] text-slate-300">
+                    Định hướng chiến lược, ra chỉ thị vĩ mô, điều phối công việc 8 phòng ban.
+                  </div>
+                  <div className="pt-1.5 border-t border-purple-500/20 text-[11px] space-y-0.5">
+                    <div className="text-amber-300 font-medium">Free Tier đề xuất:</div>
+                    <div className="text-slate-300">• Google Gemini 2.5 Pro (Free)</div>
+                    <div className="text-slate-300">• DeepSeek-R1 (Free via Groq)</div>
+                    <div className="text-slate-400">• OpenAI GPT-4o / Codex (Paid)</div>
+                  </div>
+                </div>
+
+                {/* TIER 2: MANAGER */}
+                <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-300 text-xs">👔 CẤP 2: TRƯỞNG PHÒNG</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700 font-mono">
+                      Manager Tier
+                    </span>
+                  </div>
+                  <div className="text-white font-semibold">8 Trưởng Bộ Phận (Dekisugi, Chaian, Shizuka...)</div>
+                  <div className="text-[11px] text-slate-300">
+                    Bám sát SOP chuyên môn, bóc tách kỹ thuật, Hợp đồng B2B, xử lý sự cố 8D.
+                  </div>
+                  <div className="pt-1.5 border-t border-amber-500/20 text-[11px] space-y-0.5">
+                    <div className="text-amber-300 font-medium">Free Tier đề xuất:</div>
+                    <div className="text-slate-300">• Google Gemini 2.5 Flash (Free)</div>
+                    <div className="text-slate-300">• Llama 3.3 70B (Free via Groq)</div>
+                    <div className="text-slate-400">• Claude 3.5 Sonnet (Paid)</div>
+                  </div>
+                </div>
+
+                {/* TIER 3: EXECUTIVE */}
+                <div className="p-3 bg-sky-950/30 border border-sky-500/30 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sky-300 text-xs">⚡ CẤP 3: CHUYÊN VIÊN</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-200 border border-sky-700 font-mono">
+                      Executive Tier
+                    </span>
+                  </div>
+                  <div className="text-white font-semibold">8 Chuyên Viên (Jaiko, Tamako, Sewashi...)</div>
+                  <div className="text-[11px] text-slate-300">
+                    Thực thi tác vụ nhanh, bóc tách định mức bài in Offset, kiểm kho thời gian thực.
+                  </div>
+                  <div className="pt-1.5 border-t border-sky-500/20 text-[11px] space-y-0.5">
+                    <div className="text-amber-300 font-medium">Free Tier đề xuất:</div>
+                    <div className="text-slate-300">• Google Gemini 2.5 Flash (Free)</div>
+                    <div className="text-slate-300">• Llama 3.1 8B Instant (Free via Groq)</div>
+                    <div className="text-slate-400">• GPT-4o-mini (Paid)</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status & Setup Guide for Free Tier */}
+              <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Cách Sử Dụng 100% MIỄN PHÍ (0 VNĐ) Trong Giai Đoạn Test:</span>
+                </div>
+                <div className="space-y-1.5 text-slate-300 leading-relaxed text-[11px]">
+                  <p>
+                    <strong className="text-white">1. Dùng 1 Key Google AI Studio duy nhất (Khuyên dùng):</strong> Bạn chỉ cần 1 API key từ <code className="text-sky-300 bg-sky-950 px-1 py-0.5 rounded">aistudio.google.com</code>. Không cần thẻ tín dụng, miễn phí 1.500 lượt gọi/ngày cho cả 3 tầng.
+                  </p>
+                  <p>
+                    <strong className="text-white">2. Dùng Groq Cloud Free (Tốc độ siêu tốc ~500 tokens/s):</strong> Đăng ký miễn phí tại <code className="text-sky-300 bg-sky-950 px-1 py-0.5 rounded">console.groq.com</code>. Cung cấp DeepSeek-R1 (CEO) và Meta Llama 3.3 70B (Manager) hoàn toàn 0đ.
+                  </p>
+                  <p>
+                    <strong className="text-white">3. Local SOP Engine Nội Bộ (Tự động dự phòng 0đ):</strong> Khi chưa điền API Key hoặc không có internet, hệ thống tự động bóc tách định mức bài in theo công thức <code className="text-amber-300 bg-amber-950 px-1 py-0.5 rounded">print-quote</code> (6 máy Offset, 93 loại giấy) với độ chính xác tuyệt đối.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end px-5 py-3 border-t border-slate-800 bg-slate-950/90">
+              <button
+                type="button"
+                onClick={() => setShowAiModelMatrix(false)}
+                className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg cursor-pointer transition-colors"
+              >
+                Đã hiểu & Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

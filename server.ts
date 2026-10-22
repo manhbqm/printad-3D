@@ -29,20 +29,34 @@ async function startServer() {
       !k.startsWith('MY_') &&
       k.trim().length > 6;
 
+    const doraemon = INITIAL_AGENTS.find(a => a.characterKey === 'doraemon') || INITIAL_AGENTS[0];
+    const dekisugi = INITIAL_AGENTS.find(a => a.characterKey === 'dekisugi') || INITIAL_AGENTS[1];
+    const jaiko = INITIAL_AGENTS.find(a => a.characterKey === 'jaiko') || INITIAL_AGENTS[8];
+
+    const ceoConfig = getAgentModelConfig(doraemon);
+    const managerConfig = getAgentModelConfig(dekisugi);
+    const execConfig = getAgentModelConfig(jaiko);
+
     res.json({
       tiers: {
         ceo: {
-          title: 'Ban Giám Đốc (CEO)',
+          title: ceoConfig.roleTierTitle,
           assignedCharacters: ['Doraemon (Giám Đốc Điều Hành)'],
-          provider: process.env.CEO_MODEL_PROVIDER || 'openai',
-          model: process.env.CEO_MODEL || 'gpt-4o',
-          hasKey: isKeyValid(process.env.OPENAI_API_KEY),
-          badgeLabel: '👑 CEO • OpenAI GPT-4o / Codex',
-          badgeColor: '#a855f7',
-          description: 'Định hướng chiến lược, ra chỉ thị vĩ mô, điều phối 8 phòng ban'
+          provider: ceoConfig.provider,
+          providerName: ceoConfig.providerName,
+          model: ceoConfig.modelName,
+          hasKey:
+            ceoConfig.provider === 'openai'
+              ? isKeyValid(process.env.OPENAI_API_KEY)
+              : ceoConfig.provider === 'gemini'
+              ? isKeyValid(process.env.GEMINI_API_KEY)
+              : isKeyValid(process.env.ANTHROPIC_API_KEY),
+          badgeLabel: ceoConfig.badgeLabel,
+          badgeColor: ceoConfig.badgeColor,
+          description: ceoConfig.description
         },
         manager: {
-          title: 'Trưởng Phòng (Manager)',
+          title: managerConfig.roleTierTitle,
           assignedCharacters: [
             'Dekisugi (Kinh Doanh B2B)',
             'Chaian (Marketing & QC)',
@@ -53,15 +67,21 @@ async function startServer() {
             'Thầy Sensei (Hành Chính & EHS)',
             'Nobita (Kỹ Thuật Chế Bản & TK)'
           ],
-          provider: process.env.MANAGER_MODEL_PROVIDER || 'anthropic',
-          model: process.env.MANAGER_MODEL || 'claude-3-5-sonnet-latest',
-          hasKey: isKeyValid(process.env.ANTHROPIC_API_KEY),
-          badgeLabel: '👔 Manager • Claude 3.5 Sonnet',
-          badgeColor: '#f97316',
-          description: 'Quản lý chuyên môn sâu, tuân thủ SOP, phân tích 8D, bóc tách kỹ thuật'
+          provider: managerConfig.provider,
+          providerName: managerConfig.providerName,
+          model: managerConfig.modelName,
+          hasKey:
+            managerConfig.provider === 'anthropic'
+              ? isKeyValid(process.env.ANTHROPIC_API_KEY)
+              : managerConfig.provider === 'openai'
+              ? isKeyValid(process.env.OPENAI_API_KEY)
+              : isKeyValid(process.env.GEMINI_API_KEY),
+          badgeLabel: managerConfig.badgeLabel,
+          badgeColor: managerConfig.badgeColor,
+          description: managerConfig.description
         },
         executive: {
-          title: 'Chuyên Viên (Executive)',
+          title: execConfig.roleTierTitle,
           assignedCharacters: [
             'Jaiko (Nội dung MKT)',
             'Tamako (Kế toán thanh toán)',
@@ -72,12 +92,18 @@ async function startServer() {
             'Minidora Vàng (An toàn 5S)',
             'Mẹ Chaian (Thủ kho)'
           ],
-          provider: process.env.EXECUTIVE_MODEL_PROVIDER || 'gemini',
-          model: process.env.EXECUTIVE_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-          hasKey: isKeyValid(process.env.GEMINI_API_KEY),
-          badgeLabel: '⚡ Executive • Gemini 2.5 Flash',
-          badgeColor: '#38bdf8',
-          description: 'Thực thi tác vụ nhanh, bóc tách định mức bài in, kiểm kho thời gian thực'
+          provider: execConfig.provider,
+          providerName: execConfig.providerName,
+          model: execConfig.modelName,
+          hasKey:
+            execConfig.provider === 'gemini'
+              ? isKeyValid(process.env.GEMINI_API_KEY)
+              : execConfig.provider === 'openai'
+              ? isKeyValid(process.env.OPENAI_API_KEY)
+              : isKeyValid(process.env.ANTHROPIC_API_KEY),
+          badgeLabel: execConfig.badgeLabel,
+          badgeColor: execConfig.badgeColor,
+          description: execConfig.description
         }
       }
     });

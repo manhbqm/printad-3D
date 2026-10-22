@@ -30,20 +30,43 @@ export function getAgentTier(agent: AgentProfile): AiRoleTier {
   return 'executive';
 }
 
+/**
+ * Detect provider display name (Groq Cloud, OpenRouter, Ollama, Gemini, OpenAI, Claude)
+ */
+export function getProviderDisplayName(provider: AiModelProvider): string {
+  if (provider === 'openai') {
+    const baseUrl = (process.env.OPENAI_BASE_URL || '').toLowerCase();
+    if (baseUrl.includes('groq.com')) return 'Groq Cloud (Free)';
+    if (baseUrl.includes('openrouter.ai')) return 'OpenRouter (Free)';
+    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) return 'Ollama Local (0đ)';
+    return 'OpenAI';
+  }
+  if (provider === 'anthropic') {
+    const baseUrl = (process.env.ANTHROPIC_BASE_URL || '').toLowerCase();
+    if (baseUrl.includes('openrouter.ai')) return 'OpenRouter Claude';
+    return 'Anthropic Claude';
+  }
+  if (provider === 'gemini') {
+    return 'Google Gemini (Free Tier)';
+  }
+  return 'Local SOP Engine (0đ)';
+}
+
 export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
   const tier = getAgentTier(agent);
   if (agent.aiModelConfig) return agent.aiModelConfig;
 
   if (tier === 'ceo') {
     const provider = (process.env.CEO_MODEL_PROVIDER || 'openai') as AiModelProvider;
-    const modelName = process.env.CEO_MODEL || 'gpt-4o';
+    const modelName = process.env.CEO_MODEL || (provider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4o');
+    const pName = getProviderDisplayName(provider);
     return {
       roleTier: 'ceo',
       roleTierTitle: 'Ban Giám Đốc (CEO)',
       provider,
-      providerName: provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Google Gemini',
+      providerName: pName,
       modelName,
-      badgeLabel: `👑 CEO • ${provider === 'openai' ? 'OpenAI GPT-4o / Codex' : modelName}`,
+      badgeLabel: `👑 CEO • ${pName}: ${modelName}`,
       badgeColor: '#a855f7',
       description: 'Định hướng chiến lược, ra chỉ thị vĩ mô, điều phối toàn công ty'
     };
@@ -51,28 +74,39 @@ export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
 
   if (tier === 'manager') {
     const provider = (process.env.MANAGER_MODEL_PROVIDER || 'anthropic') as AiModelProvider;
-    const modelName = process.env.MANAGER_MODEL || 'claude-3-5-sonnet-latest';
+    const modelName =
+      process.env.MANAGER_MODEL ||
+      (provider === 'gemini'
+        ? 'gemini-2.5-flash'
+        : provider === 'openai'
+        ? 'llama-3.3-70b-versatile'
+        : 'claude-3-5-sonnet-latest');
+    const pName = getProviderDisplayName(provider);
     return {
       roleTier: 'manager',
       roleTierTitle: 'Trưởng Phòng (Manager)',
       provider,
-      providerName: provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'Google Gemini',
+      providerName: pName,
       modelName,
-      badgeLabel: `👔 Manager • ${provider === 'anthropic' ? 'Claude 3.5 Sonnet' : modelName}`,
+      badgeLabel: `👔 Manager • ${pName}: ${modelName}`,
       badgeColor: '#f97316',
       description: 'Quản lý chuyên môn sâu, tuân thủ SOP, phân tích 8D, bóc tách kỹ thuật'
     };
   }
 
   const provider = (process.env.EXECUTIVE_MODEL_PROVIDER || 'gemini') as AiModelProvider;
-  const modelName = process.env.EXECUTIVE_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName =
+    process.env.EXECUTIVE_MODEL ||
+    process.env.GEMINI_MODEL ||
+    (provider === 'openai' ? 'llama-3.1-8b-instant' : 'gemini-2.5-flash');
+  const pName = getProviderDisplayName(provider);
   return {
     roleTier: 'executive',
     roleTierTitle: 'Chuyên Viên (Executive)',
     provider,
-    providerName: provider === 'gemini' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'Anthropic',
+    providerName: pName,
     modelName,
-    badgeLabel: `⚡ Executive • ${provider === 'gemini' ? 'Gemini 2.5 Flash' : modelName}`,
+    badgeLabel: `⚡ Executive • ${pName}: ${modelName}`,
     badgeColor: '#38bdf8',
     description: 'Thực thi tác vụ nhanh, bóc tách định mức bài in, kiểm kho thời gian thực'
   };
@@ -81,7 +115,7 @@ export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
 export function getSystemInstruction(targetAgent: AgentProfile, deptSopsText: string): string {
   const modelCfg = getAgentModelConfig(targetAgent);
   return `Bạn là ${targetAgent.name} — ${targetAgent.roleTitle} thuộc ${targetAgent.departmentLabel} tại Công ty In ấn & Quảng cáo PrintAd.
-CẤP BẬC MÔ HÌNH AI: ${modelCfg.roleTierTitle} (Vận hành bởi mô hình ${modelCfg.providerName} - ${modelCfg.modelName}).
+CẤP BẬC MÔ HÌNH AI: ${modelCfg.roleTierTitle} (Vận hành bởi ${modelCfg.providerName} - mô hình ${modelCfg.modelName}).
 Nhiệm vụ chính: ${targetAgent.primaryMission}
 Ranh giới chuyên môn nghiêm ngặt: ${targetAgent.strictBoundary}
 Đặc điểm tính cách: ${targetAgent.personalityTraits.join('; ')}
@@ -90,7 +124,7 @@ Hành vi văn phòng 3D: ${targetAgent.spatialBehavior}
 QUY CHUẨN ĐÀO TẠO SOP BẮT BUỘC:
 ${deptSopsText}
 
-Hãy thực hiện nhiệm vụ người dùng giao và trả về JSON thuần túy (không kèm markdown) gồm các trường:
+Hãy thực hiện nhiệm vụ người dùng giao và trả về DUY NHẤT một chuỗi JSON thuần túy (không kèm markdown \`\`\`json) gồm các trường:
 - headline: string (Tiêu đề báo cáo kết quả)
 - summary: string (Tóm tắt ngắn gọn quy chuẩn đã áp dụng)
 - spatialActionTaken: string (Hành động trong văn phòng 3D)
@@ -100,7 +134,37 @@ Hãy thực hiện nhiệm vụ người dùng giao và trả về JSON thuần 
 }
 
 /**
- * Call OpenAI API (Codex / GPT-4o / GPT-4o-mini)
+ * Bulletproof JSON cleanup:
+ * 1. Strips DeepSeek R1 <think>...</think> reasoning blocks
+ * 2. Strips markdown fences ```json ... ```
+ * 3. Extracts between first '{' and last '}'
+ */
+export function cleanJsonText(raw: string): string {
+  if (!raw) return '{}';
+  let cleaned = raw.trim();
+
+  // Strip DeepSeek R1 reasoning tags <think>...</think>
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // Strip Markdown fences
+  cleaned = cleaned
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+
+  // Extract from first '{' to last '}'
+  const startIdx = cleaned.indexOf('{');
+  const endIdx = cleaned.lastIndexOf('}');
+  if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+    cleaned = cleaned.slice(startIdx, endIdx + 1);
+  }
+
+  return cleaned;
+}
+
+/**
+ * Call OpenAI API or OpenAI-Compatible Endpoints (Groq Cloud, OpenRouter, Ollama)
  */
 async function callOpenAi(params: {
   apiKey: string;
@@ -109,36 +173,59 @@ async function callOpenAi(params: {
   prompt: string;
 }): Promise<any> {
   const baseUrl = process.env.OPENAI_BASE_URL?.replace(/\/$/, '') || 'https://api.openai.com/v1';
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+
+  const payload: any = {
+    model: params.model,
+    messages: [
+      { role: 'system', content: params.systemInstruction },
+      {
+        role: 'user',
+        content: `Nhiệm vụ cần thực hiện: "${params.prompt}". Hãy phân tích theo đúng vai trò và trả về DUY NHẤT một chuỗi JSON hợp lệ tuân thủ các trường đã quy định: headline, summary, spatialActionTaken, keyFindings, totalAmountFormatted, recommendation.`
+      }
+    ],
+    temperature: 0.3
+  };
+
+  // Only pass response_format if not disabled
+  if (!process.env.OPENAI_DISABLE_JSON_FORMAT) {
+    payload.response_format = { type: 'json_object' };
+  }
+
+  let response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${params.apiKey}`
     },
-    body: JSON.stringify({
-      model: params.model,
-      messages: [
-        { role: 'system', content: params.systemInstruction },
-        {
-          role: 'user',
-          content: `Nhiệm vụ cần thực hiện: "${params.prompt}". Hãy phân tích theo đúng vai trò và trả về DUY NHẤT một chuỗi JSON hợp lệ tuân thủ các trường đã quy định.`
-        }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3
-    }),
-    signal: AbortSignal.timeout(10000)
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000)
   });
+
+  // If endpoint fails with 400 because of response_format, retry once without it
+  if (!response.ok && response.status === 400 && payload.response_format) {
+    delete payload.response_format;
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${params.apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000)
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`OpenAI API error (${response.status}): ${errText}`);
+    throw new Error(`OpenAI-compatible API error (${response.status}): ${errText}`);
   }
 
   const json: any = await response.json();
   const rawContent = json?.choices?.[0]?.message?.content;
-  if (!rawContent) throw new Error('OpenAI returned empty message content');
-  return JSON.parse(rawContent);
+  if (!rawContent) throw new Error('API returned empty message content');
+
+  const cleanJson = cleanJsonText(rawContent);
+  return JSON.parse(cleanJson);
 }
 
 /**
@@ -170,7 +257,7 @@ async function callAnthropic(params: {
       ],
       temperature: 0.3
     }),
-    signal: AbortSignal.timeout(10000)
+    signal: AbortSignal.timeout(15000)
   });
 
   if (!response.ok) {
@@ -182,13 +269,12 @@ async function callAnthropic(params: {
   const rawText = json?.content?.[0]?.text;
   if (!rawText) throw new Error('Anthropic returned empty content');
 
-  // Strip possible markdown code fence
-  const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+  const cleanJson = cleanJsonText(rawText);
   return JSON.parse(cleanJson);
 }
 
 /**
- * Call Google Gemini API (Gemini 2.5 Flash / 3.8 Flash)
+ * Call Google Gemini API (Gemini 2.5 Flash / 3.8 Flash / 2.5 Pro)
  */
 async function callGemini(params: {
   apiKey: string;
@@ -235,7 +321,9 @@ async function callGemini(params: {
 
   const rawText = response.text;
   if (!rawText) throw new Error('Gemini returned empty text');
-  return JSON.parse(rawText);
+
+  const cleanJson = cleanJsonText(rawText);
+  return JSON.parse(cleanJson);
 }
 
 /**
@@ -266,7 +354,11 @@ export async function executeMultiModelTask(input: MultiModelExecutionInput): Pr
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
 
-  const isKeyValid = (k?: string) => !!k && k !== 'MY_GEMINI_API_KEY' && k !== 'MY_OPENAI_API_KEY' && k !== 'MY_ANTHROPIC_API_KEY' && k.length > 5;
+  const isKeyValid = (k?: string) =>
+    !!k &&
+    !k.startsWith('MY_') &&
+    k !== 'your_api_key_here' &&
+    k.length > 5;
 
   let parsedResult: any = null;
   let providerUsed: AiModelProvider | 'local-engine' = 'local-engine';
@@ -303,7 +395,7 @@ export async function executeMultiModelTask(input: MultiModelExecutionInput): Pr
       modelUsed = modelConfig.modelName;
     }
   } catch (primaryErr: any) {
-    console.warn(`[MultiModelGateway] Primary provider (${modelConfig.provider}) failed: ${primaryErr?.message || primaryErr}. Attempting fallback...`);
+    console.warn(`[MultiModelGateway] Primary provider (${modelConfig.provider} - ${modelConfig.modelName}) failed: ${primaryErr?.message || primaryErr}. Attempting fallback...`);
   }
 
   // Fallback to any other configured LLM provider if primary failed or key missing
@@ -377,7 +469,7 @@ export async function executeMultiModelTask(input: MultiModelExecutionInput): Pr
     };
   }
 
-  // Deterministic local fallback
+  // Deterministic local fallback (0đ, 0 tokens, instant)
   return {
     ...fallbackReport,
     modelUsed: modelConfig.modelName,
