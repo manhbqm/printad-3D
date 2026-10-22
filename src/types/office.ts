@@ -85,6 +85,20 @@ export type DoraemonCharacterKey =
   | 'sunetsugu'
   | 'goda_mom';
 
+export type AiRoleTier = 'ceo' | 'manager' | 'executive';
+export type AiModelProvider = 'openai' | 'anthropic' | 'gemini';
+
+export interface AgentModelConfig {
+  roleTier: AiRoleTier;
+  roleTierTitle: string;
+  provider: AiModelProvider;
+  providerName: string;
+  modelName: string;
+  badgeLabel: string;
+  badgeColor: string;
+  description: string;
+}
+
 export interface AgentProfile {
   id: string;
   characterKey: DoraemonCharacterKey;
@@ -117,6 +131,8 @@ export interface AgentProfile {
   workstationLookAt: Vector3Tuple;
   collaborationPoint: Vector3Tuple;
   sampleTasks: SampleTaskPreset[];
+  roleTier?: AiRoleTier;
+  aiModelConfig?: AgentModelConfig;
 }
 
 export type TaskStatus =
@@ -171,7 +187,10 @@ export interface TaskReport {
   formalDocument?: FormalDocument;
   recommendation: string;
   executionTimeSec: number;
-  sourceMode: 'gemini-api' | 'sop-engine';
+  sourceMode: 'gemini-api' | 'sop-engine' | 'openai-api' | 'anthropic-api';
+  modelUsed?: string;
+  providerUsed?: 'openai' | 'anthropic' | 'gemini' | 'local-engine';
+  roleTierUsed?: AiRoleTier;
   coordinatorDispatch?: CoordinatorDispatchInfo;
 }
 

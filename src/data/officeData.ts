@@ -469,6 +469,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-hr',
     characterKey: 'doraemon',
+    roleTier: 'ceo',
     name: 'Doraemon (Đô-rê-mon)',
     roleTitle: 'Master Agent & Trợ Lý Cấp Cao Ban Giám Đốc',
     departmentId: 'board_executive',
@@ -541,6 +542,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-business',
     characterKey: 'dekisugi',
+    roleTier: 'manager',
     name: 'Dekisugi (Đê-khi)',
     roleTitle: 'Trưởng phòng Kinh Doanh B2B & Quản Trị Dự Án',
     departmentId: 'sales_b2b',
@@ -611,6 +613,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-marketing',
     characterKey: 'chaian',
+    roleTier: 'manager',
     name: 'Chaian (Chaien)',
     roleTitle: 'Trưởng phòng Marketing Công Nghiệp & Phát Triển Thị Trường',
     departmentId: 'marketing',
@@ -680,6 +683,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-sales',
     characterKey: 'shizuka',
+    roleTier: 'manager',
     name: 'Shizuka (Xuka)',
     roleTitle: 'Trưởng phòng Chăm Sóc Khách Hàng & Dịch Vụ Hậu Mãi',
     departmentId: 'customer_service',
@@ -751,6 +755,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-accounting',
     characterKey: 'suneo',
+    roleTier: 'manager',
     name: 'Suneo (Xêko)',
     roleTitle: 'Kế Toán Trưởng & Quản Trị Tài Chính Doanh Nghiệp',
     departmentId: 'accounting',
@@ -823,6 +828,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-hr-staff',
     characterKey: 'dorami',
+    roleTier: 'manager',
     name: 'Dorami (Đô-rê-mi)',
     roleTitle: 'Trưởng phòng Nhân Sự & Quản Trị Lao Động Nhà Máy',
     departmentId: 'human_resources',
@@ -892,6 +898,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-warehouse',
     characterKey: 'kaminari',
+    roleTier: 'manager',
     name: 'Bác Kaminari (Bác Sấm Sét)',
     roleTitle: 'Trưởng phòng Quản Trị Kho Bãi & Mua Hàng Vật Tư',
     departmentId: 'warehouse_supply',
@@ -961,6 +968,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-admin',
     characterKey: 'sensei',
+    roleTier: 'manager',
     name: 'Thầy Giáo Chủ Nhiệm (Sensei)',
     roleTitle: 'Trưởng phòng Hành Chính Quản Trị & An Toàn EHS',
     departmentId: 'administration_ehs',
@@ -1030,6 +1038,7 @@ export const INITIAL_AGENTS: AgentProfile[] = [
   {
     id: 'agent-design',
     characterKey: 'nobita',
+    roleTier: 'manager',
     name: 'Nobita',
     roleTitle: 'Kỹ Sư Thiết Kế Đồ Họa & Preflight CMYK',
     departmentId: 'design_tech',

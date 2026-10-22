@@ -2,12 +2,16 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type } from '@google/genai';
 import { INITIAL_AGENTS, INITIAL_SOP_DOCUMENTS } from './src/data/officeData';
 import {
   generateLocalSopGroundedReport,
   validateScopeAndRoute
 } from './src/utils/officeLogic';
+import {
+  executeMultiModelTask,
+  getAgentModelConfig,
+  getAgentTier
+} from './src/utils/aiMultiModelDispatcher';
 import { AgentProfile, SopDocument, TaskReport } from './src/types/office';
 
 dotenv.config();
@@ -18,6 +22,67 @@ async function startServer() {
 
   app.use(express.json({ limit: '2mb' }));
 
+  // Endpoint to inspect active multi-model role tier configurations & key statuses
+  app.get('/api/agent/models-config', (_req, res) => {
+    const isKeyValid = (k?: string) =>
+      !!k &&
+      !k.startsWith('MY_') &&
+      k.trim().length > 6;
+
+    res.json({
+      tiers: {
+        ceo: {
+          title: 'Ban Giám Đốc (CEO)',
+          assignedCharacters: ['Doraemon (Giám Đốc Điều Hành)'],
+          provider: process.env.CEO_MODEL_PROVIDER || 'openai',
+          model: process.env.CEO_MODEL || 'gpt-4o',
+          hasKey: isKeyValid(process.env.OPENAI_API_KEY),
+          badgeLabel: '👑 CEO • OpenAI GPT-4o / Codex',
+          badgeColor: '#a855f7',
+          description: 'Định hướng chiến lược, ra chỉ thị vĩ mô, điều phối 8 phòng ban'
+        },
+        manager: {
+          title: 'Trưởng Phòng (Manager)',
+          assignedCharacters: [
+            'Dekisugi (Kinh Doanh B2B)',
+            'Chaian (Marketing & QC)',
+            'Shizuka (CSKH & Báo Giá)',
+            'Suneo (Kế Toán & Chi Phí)',
+            'Dorami (Nhân Sự & Đào Tạo)',
+            'Bác Kaminari (Kho & Cung Ứng)',
+            'Thầy Sensei (Hành Chính & EHS)',
+            'Nobita (Kỹ Thuật Chế Bản & TK)'
+          ],
+          provider: process.env.MANAGER_MODEL_PROVIDER || 'anthropic',
+          model: process.env.MANAGER_MODEL || 'claude-3-5-sonnet-latest',
+          hasKey: isKeyValid(process.env.ANTHROPIC_API_KEY),
+          badgeLabel: '👔 Manager • Claude 3.5 Sonnet',
+          badgeColor: '#f97316',
+          description: 'Quản lý chuyên môn sâu, tuân thủ SOP, phân tích 8D, bóc tách kỹ thuật'
+        },
+        executive: {
+          title: 'Chuyên Viên (Executive)',
+          assignedCharacters: [
+            'Jaiko (Nội dung MKT)',
+            'Tamako (Kế toán thanh toán)',
+            'Sewashi (Phân tích Data/CRM)',
+            'Sunetsugu (Thu mua vật tư)',
+            'Minidora Đỏ (Vận hành in Offset)',
+            'Nobisuke (Bảo trì cơ điện)',
+            'Minidora Vàng (An toàn 5S)',
+            'Mẹ Chaian (Thủ kho)'
+          ],
+          provider: process.env.EXECUTIVE_MODEL_PROVIDER || 'gemini',
+          model: process.env.EXECUTIVE_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+          hasKey: isKeyValid(process.env.GEMINI_API_KEY),
+          badgeLabel: '⚡ Executive • Gemini 2.5 Flash',
+          badgeColor: '#38bdf8',
+          description: 'Thực thi tác vụ nhanh, bóc tách định mức bài in, kiểm kho thời gian thực'
+        }
+      }
+    });
+  });
+
   app.post('/api/agent/execute-task', async (req, res) => {
     try {
       const { agent, prompt, sops, allAgents } = req.body as {
@@ -27,8 +92,7 @@ async function startServer() {
         allAgents?: AgentProfile[];
       };
 
-      const targetAgent =
-        agent || INITIAL_AGENTS[0];
+      const targetAgent = agent || INITIAL_AGENTS[0];
       const taskPrompt = String(prompt || '').trim();
       const activeSops = Array.isArray(sops) ? sops : INITIAL_SOP_DOCUMENTS;
       const agentList = Array.isArray(allAgents) ? allAgents : INITIAL_AGENTS;
@@ -38,135 +102,17 @@ async function startServer() {
         return;
       }
 
-      // First check strict department specialization boundaries
-      const scopeCheck = validateScopeAndRoute(
-        targetAgent,
-        taskPrompt,
-        agentList,
-        activeSops
-      );
-
-      const fallbackReport = generateLocalSopGroundedReport(
-        targetAgent,
-        taskPrompt,
-        agentList,
-        activeSops
-      );
-
-      // If out of scope, immediately return the strict role boundary rejection report
-      if (!scopeCheck.isInScope) {
-        res.json({ report: fallbackReport });
-        return;
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
-        res.json({ report: fallbackReport });
-        return;
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build'
-          }
-        }
+      // Execute via the multi-model role tier dispatcher
+      const report = await executeMultiModelTask({
+        agent: targetAgent,
+        prompt: taskPrompt,
+        sops: activeSops,
+        allAgents: agentList
       });
 
-      const deptSopsText = scopeCheck.matchedSops
-        .map(
-          (doc) =>
-            `[${doc.code}] ${doc.title}:\n` +
-            doc.rules.map((r, idx) => `  ${idx + 1}. ${r}`).join('\n')
-        )
-        .join('\n\n');
-
-      const systemInstruction = `Bạn là ${targetAgent.name} — ${targetAgent.roleTitle} thuộc ${targetAgent.departmentLabel} tại Công ty In ấn & Quảng cáo PrintAd.
-Nhiệm vụ chính của bạn: ${targetAgent.primaryMission}
-Giới hạn chuyên môn nghiêm ngặt: ${targetAgent.strictBoundary}
-Đặc điểm tính cách: ${targetAgent.personalityTraits.join('; ')}
-Hành vi tương tác trong văn phòng 3D: ${targetAgent.spatialBehavior}
-
-TÀI LIỆU QUY CHUẨN HUẤN LUYỆN (SOP) BẮT BUỘC TUÂN THỦ:
-${deptSopsText}
-
-Hãy thực hiện nhiệm vụ người dùng giao theo đúng quy chuẩn SOP trên và trả về báo cáo ngắn gọn, súc tích, chuyên nghiệp bằng tiếng Việt.`;
-
-      const modelName = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: `Nhiệm vụ được giao: "${taskPrompt}"`,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              headline: {
-                type: Type.STRING,
-                description: 'Tiêu đề báo cáo kết quả nhiệm vụ'
-              },
-              summary: {
-                type: Type.STRING,
-                description: 'Tóm tắt ngắn gọn kết quả thực hiện theo SOP'
-              },
-              spatialActionTaken: {
-                type: Type.STRING,
-                description: 'Mô tả hành động tương tác của trợ lý trong không gian văn phòng 3D'
-              },
-              keyFindings: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: '3-4 kết quả hoặc điểm chính đã thực hiện theo SOP'
-              },
-              totalAmountFormatted: {
-                type: Type.STRING,
-                description: 'Tổng kết con số định lượng, báo giá hoặc chỉ số đạt được'
-              },
-              recommendation: {
-                type: Type.STRING,
-                description: 'Đề xuất bước tiếp theo hoặc phối hợp phòng ban'
-              }
-            },
-            required: [
-              'headline',
-              'summary',
-              'spatialActionTaken',
-              'keyFindings',
-              'totalAmountFormatted',
-              'recommendation'
-            ]
-          }
-        }
-      });
-
-      const rawText = response.text;
-      if (!rawText) {
-        res.json({ report: fallbackReport });
-        return;
-      }
-
-      const parsed = JSON.parse(rawText);
-      const mergedReport: TaskReport = {
-        ...fallbackReport,
-        headline: parsed.headline || fallbackReport.headline,
-        summary: parsed.summary || fallbackReport.summary,
-        spatialActionTaken:
-          parsed.spatialActionTaken || fallbackReport.spatialActionTaken,
-        keyFindings:
-          Array.isArray(parsed.keyFindings) && parsed.keyFindings.length > 0
-            ? parsed.keyFindings
-            : fallbackReport.keyFindings,
-        totalAmountFormatted:
-          parsed.totalAmountFormatted || fallbackReport.totalAmountFormatted,
-        recommendation: parsed.recommendation || fallbackReport.recommendation,
-        sourceMode: 'gemini-api'
-      };
-
-      res.json({ report: mergedReport });
-    } catch (err) {
-      // Fallback to deterministic SOP engine so user experience is never broken
+      res.json({ report });
+    } catch (err: any) {
+      console.error('[ExecuteTask] Error:', err);
       const { agent, prompt, sops, allAgents } = req.body || {};
       const fallback = generateLocalSopGroundedReport(
         agent || INITIAL_AGENTS[0],

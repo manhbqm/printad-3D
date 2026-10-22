@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SKILLS_CATALOG } from '../data/officeData';
 import { CLOUD_PRINT_QUOTE_URL } from '../utils/printQuoteEngine';
+import { getAgentModelConfig } from '../utils/aiMultiModelDispatcher';
 import {
   AgentProfile,
   DepartmentId,
@@ -181,6 +182,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
 
   // Quick print quote calculator state (for Sales/Quoting department)
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
+  const [showAiModelMatrix, setShowAiModelMatrix] = useState<boolean>(false);
   const [quoteInput, setQuoteInput] = useState<PrintQuoteInput>({
     materialType: 'hiflex',
     widthMeters: 6,
@@ -365,7 +367,7 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>Hồ sơ 5 Trợ lý AI</span>
+                <span>Nhân sự & AI Models (17)</span>
               </button>
 
               <button

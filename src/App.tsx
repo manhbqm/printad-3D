@@ -234,7 +234,7 @@ export default function App() {
     // Optional background enrichment from server-side Gemini endpoint with timeout
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const response = await fetch('/api/agent/execute-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
