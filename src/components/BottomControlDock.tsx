@@ -15,6 +15,8 @@ import {
   Users,
   Video
 } from 'lucide-react';
+import { SKILLS_CATALOG } from '../data/officeData';
+import { CLOUD_PRINT_QUOTE_URL } from '../utils/printQuoteEngine';
 import {
   AgentProfile,
   DepartmentId,
@@ -70,39 +72,74 @@ const CEO_DIRECTIVE_PRESETS: {
   expectedDeptHint: string;
 }[] = [
   {
-    id: 'ceo-quote',
-    label: 'Báo giá 80m2 bạt Hiflex, làm Hợp đồng & Phiếu giao hàng',
+    id: 'ceo-bgd',
+    label: '/bgd — Tổng hợp điều hành 1 trang & Đánh giá điểm nghẽn toàn công ty',
     prompt:
-      'Khách hàng chuỗi cửa hàng đặt in 80m2 bạt Hiflex ngoài trời và 12 bộ Standee cuốn nhôm. Hãy tính báo giá chi tiết, soạn Hợp đồng mua bán, Phiếu mua bán và Phiếu giao hàng cho khách.',
-    expectedDeptHint: '→ Shizuka (CSKH & Báo giá)'
+      '/bgd Hãy tổng hợp báo cáo điều hành tuần của 8 phòng ban, chỉ rõ các điểm nghẽn sản xuất, biến động chi phí và tỷ lệ giao hàng đúng hạn OTIF.',
+    expectedDeptHint: '→ Doraemon (Ban Giám Đốc)'
   },
   {
-    id: 'ceo-design',
-    label: 'Chỉnh sửa file thiết kế Poster & Catalog chuẩn in CMYK',
+    id: 'ceo-bgd-minutes',
+    label: '/bgd — Soạn Biên bản họp giao ban tuần 43 và phân công hành động RACI',
     prompt:
-      'Khách vừa gửi bộ file thiết kế Poster quảng cáo và Catalog 16 trang. Kiểm tra và chỉnh sửa ngay hệ màu CMYK, tràn lề bleed 3mm, convert font chữ và in thử bản proof tại khu chung.',
-    expectedDeptHint: '→ Nobita (Thiết kế)'
+      '/bgd Lập biên bản họp giao ban điều hành sản xuất tuần 43, tổng hợp các quyết định then chốt và lập bảng ma trận phân công hành động RACI.',
+    expectedDeptHint: '→ Doraemon (Ghi chú họp & RACI)'
   },
   {
-    id: 'ceo-acc',
-    label: 'Đối soát công nợ, hợp đồng đối tác & giấy tờ hóa đơn VAT',
+    id: 'ceo-kd',
+    label: '/kd — Lập Hợp đồng kinh tế B2B in 2.000m² bạt & bảo lãnh điều khoản SLA',
     prompt:
-      'Kiểm tra toàn bộ công nợ tháng 10, thông tin hợp đồng đối tác & khách hàng B2B, đối soát chi phí vật tư và chuẩn bị giấy tờ hóa đơn VAT cho các đơn đã giao.',
-    expectedDeptHint: '→ Suneo (Kế toán)'
+      '/kd Hãy soạn thảo Hợp đồng kinh tế B2B cung ứng 2.000m² bạt Hiflex và 30 bộ Standee cho khách hàng chuỗi siêu thị, rà soát điều khoản phạt trần 8% theo luật định.',
+    expectedDeptHint: '→ Dekisugi (Kinh Doanh & Pháp Chế)'
   },
   {
-    id: 'ceo-mkt',
-    label: 'Tìm hiểu đối thủ cạnh tranh & chiến dịch Marketing POSM',
+    id: 'ceo-kd-email',
+    label: '/kd — Soạn thư điện tử gửi Báo giá gia công B2B chuẩn mực cho đối tác FDI',
     prompt:
-      'Tìm hiểu về đối thủ cạnh tranh trực tiếp trong mảng in nhanh và thi công biển hiệu tại khu vực, so sánh khung giá m2 và đề xuất chiến dịch Marketing gói Combo POSM Khai Trương.',
-    expectedDeptHint: '→ Chaian (Marketing)'
+      '/kd Soạn thư điện tử thương mại B2B gửi bảng báo giá in ấn và gia công cho đối tác Takata Vietnam, nêu rõ điều kiện giao hàng Incoterms 2020 và thời hạn hiệu lực.',
+    expectedDeptHint: '→ Dekisugi (Email B2B)'
   },
   {
-    id: 'ceo-hr',
-    label: 'Tư vấn tổng hợp vận hành chung & điều phối xưởng in',
+    id: 'ceo-cskh',
+    label: '/cskh — Lập Phiếu giao hàng kiêm Biên bản bàn giao & nghiệm thu 02 liên',
     prompt:
-      'Doraemon hãy tư vấn tổng hợp chung cho Giám đốc về tình hình phối hợp giữa các bộ phận (Shizuka, Suneo, Nobita, Chaian) và phương án điều phối nhân sự xưởng in tuần cao điểm.',
-    expectedDeptHint: '→ Doraemon (Quản lý chung)'
+      '/cskh Lập phiếu giao hàng kiêm biên bản bàn giao sản phẩm cho lô hàng 80m² bạt Hiflex và 12 bộ Standee cuốn nhôm, đầy đủ 4 chữ ký xác nhận.',
+    expectedDeptHint: '→ Shizuka (CSKH & Phiếu giao hàng)'
+  },
+  {
+    id: 'ceo-cskh-8d',
+    label: '/cskh — Kích hoạt quy trình 8D xử lý khiếu nại sản phẩm in bị xước bề mặt',
+    prompt:
+      '/cskh Khách hàng phản ánh lô hàng in bạt 80m² bị trầy xước bề mặt. Hãy kích hoạt kịch bản xử lý khiếu nại 8D, cô lập lô hàng lỗi, xuất hàng đệm bù trong 4h và lập báo cáo CAPA.',
+    expectedDeptHint: '→ Shizuka (Giải quyết sự cố 8D)'
+  },
+  {
+    id: 'ceo-kt-debt',
+    label: '/kt — Soạn thư đôn đốc đối chiếu và thu hồi công nợ đến hạn đợt 2',
+    prompt:
+      '/kt Lập thư điện tử lịch sự gửi Kế toán trưởng đối tác đề nghị đối chiếu công nợ và thanh toán đợt 2 số tiền 135.000.000đ cho đơn hàng bạt quảng cáo.',
+    expectedDeptHint: '→ Suneo (Kế toán & Công nợ)'
+  },
+  {
+    id: 'ceo-kho-kanban',
+    label: '/kho — Lập bảng Kanban quản trị tiến độ đơn hàng sản xuất 4 cột',
+    prompt:
+      '/kho Lập bảng theo dõi tiến độ sản xuất đơn hàng theo phương pháp Kanban 4 cột (Backlog, Chuẩn bị phôi, Đang in 3 ca, Hoàn tất bàn giao).',
+    expectedDeptHint: '→ Bác Kaminari (Kho & Kanban)'
+  },
+  {
+    id: 'ceo-hc-sop',
+    label: '/hc — Soạn Quy trình vận hành tiêu chuẩn SOP chuẩn ISO 9001:2015',
+    prompt:
+      '/hc Biên soạn Quy trình vận hành tiêu chuẩn SOP kiểm tra an toàn PCCC, bảo dưỡng máy in đầu ca và tiêu chuẩn 5S hiện trường sản xuất.',
+    expectedDeptHint: '→ Thầy Giáo (Hành chính & ISO)'
+  },
+  {
+    id: 'ceo-cty',
+    label: '/cty — Tra cứu Hồ sơ năng lực pháp nhân, chứng chỉ ISO & chính sách bảo mật PII',
+    prompt:
+      '/cty Tra cứu hồ sơ năng lực pháp lý công ty PrintAd 3D, danh mục máy móc thiết bị nhà xưởng và quy chế bảo mật thông tin doanh nghiệp PII/NDA.',
+    expectedDeptHint: '→ Doraemon & Thầy Giáo (/cty 00-cong-ty)'
   }
 ];
 
@@ -161,6 +198,9 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
   const [sopRulesText, setSopRulesText] = useState<string>('');
   const [sopError, setSopError] = useState<string>('');
   const [sopSuccess, setSopSuccess] = useState<string>('');
+  const [skillsViewMode, setSkillsViewMode] = useState<'sops' | 'skills_catalog'>('sops');
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState<'all' | 'office_12' | 'deep_30'>('all');
+  const [skillSearchQuery, setSkillSearchQuery] = useState<string>('');
 
   const quoteResult = calculatePrintQuote(quoteInput);
 
@@ -466,8 +506,16 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                       }`}
                     >
                       <div className="truncate pr-2">
-                        <div className="text-xs font-bold text-white truncate">
-                          {ag.name} · {ag.departmentLabel}
+                        <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                          <span className="truncate">{ag.name}</span>
+                          {ag.slashCommand && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-950 text-sky-400 border border-sky-800 font-mono shrink-0">
+                              {ag.slashCommand}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {ag.departmentLabel}
                         </div>
                         <div className="text-[11px] text-slate-400 truncate">
                           {ag.roleTitle}
@@ -515,6 +563,19 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1.5">
+                    {selectedAgent.slashCommand && (
+                      <div className="flex items-center gap-2 pb-1">
+                        <span className="text-xs font-semibold text-sky-400">Lệnh Sub-Agent:</span>
+                        <code className="text-xs font-mono font-bold bg-sky-950 text-sky-300 px-2 py-0.5 rounded border border-sky-700">
+                          {selectedAgent.slashCommand}
+                        </code>
+                        {selectedAgent.subAgentModule && (
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            ({selectedAgent.subAgentModule})
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <span className="font-semibold text-slate-200">Nhiệm vụ chính: </span>
                       <span className="text-slate-300">{selectedAgent.primaryMission}</span>
@@ -539,6 +600,27 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {selectedAgent.skills && selectedAgent.skills.length > 0 && (
+                  <div className="border-t border-slate-800 pt-2.5 mt-1">
+                    <div className="text-xs font-semibold text-amber-400 mb-1.5 flex items-center justify-between">
+                      <span>Bộ Skills Chuyên Môn Claude SubAgent ({selectedAgent.skills.length} skills):</span>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Module: {selectedAgent.subAgentModule || '8-phong-ban'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {selectedAgent.skills.map((skillName) => (
+                        <span
+                          key={skillName}
+                          className="text-[11px] px-2 py-0.5 bg-slate-800 text-slate-200 border border-slate-700 rounded font-mono hover:border-amber-400/60 transition-colors"
+                        >
+                          {skillName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1012,6 +1094,80 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                         <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
                           Đề xuất tiếp theo: {selectedTask.report.recommendation}
                         </div>
+
+                        {selectedTask.report?.formalDocument && (
+                          <div className="mt-3 border border-amber-500/40 rounded-xl bg-slate-950/95 overflow-hidden shadow-2xl">
+                            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-gradient-to-r from-amber-950/60 to-slate-900 border-b border-amber-500/30">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">
+                                  {(() => {
+                                  const t = selectedTask.report.formalDocument.documentType;
+                                  if (t === 'contract') return '📜';
+                                  if (t === 'delivery_note') return '📦';
+                                  if (t === 'b2b_email') return '✉️';
+                                  if (t === 'meeting_minutes') return '📋';
+                                  if (t === 'complaint_8d') return '🛡️';
+                                  if (t === 'iso_sop') return '⚙️';
+                                  if (t === 'kanban_tracking') return '📊';
+                                  if (t === 'company_profile') return '🏛️';
+                                  return '📄';
+                                })()}
+                                </span>
+                                <div>
+                                  <div className="text-xs font-bold text-amber-300">
+                                    {selectedTask.report.formalDocument.title}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    Quy chuẩn văn bản hành chính · Đạt tiêu chuẩn Luật Thương mại & Nghị định 30/2020/NĐ-CP
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (navigator.clipboard && selectedTask.report?.formalDocument) {
+                                      navigator.clipboard.writeText(selectedTask.report.formalDocument.content);
+                                      alert('Đã sao chép toàn bộ văn bản vào bộ nhớ tạm! Bạn có thể dán (Ctrl+V) vào Word hoặc gửi khách hàng.');
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 rounded shadow cursor-pointer transition-colors"
+                                >
+                                  📋 Sao chép văn bản
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const printWin = window.open('', '_blank');
+                                    if (printWin && selectedTask.report?.formalDocument) {
+                                      printWin.document.write(`
+                                        <html>
+                                          <head>
+                                            <title>${selectedTask.report.formalDocument.title}</title>
+                                            <style>
+                                              body { font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.6; margin: 40px; white-space: pre-wrap; color: #111; }
+                                              @media print { body { margin: 20mm; font-size: 12pt; } }
+                                            </style>
+                                          </head>
+                                          <body>${selectedTask.report.formalDocument.content}</body>
+                                        </html>
+                                      `);
+                                      printWin.document.close();
+                                      printWin.focus();
+                                      printWin.print();
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700 rounded cursor-pointer transition-colors"
+                                >
+                                  🖨️ In / Xuất PDF
+                                </button>
+                              </div>
+                            </div>
+                            <div className="p-3.5 max-h-72 overflow-y-auto bg-slate-950/80 font-mono text-[11px] text-slate-200 whitespace-pre-wrap leading-relaxed select-text border-t border-slate-900">
+                              {selectedTask.report.formalDocument.content}
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1024,152 +1180,244 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
             </div>
           )}
 
-          {/* TAB 4: TRAINING SOP DOCUMENTS BY DEPARTMENT */}
+          {/* TAB 4: TRAINING SOP DOCUMENTS & 42 SKILLS CATALOG */}
           {activeTab === 'sops' && (
-            <div className="p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 max-h-[255px] overflow-y-auto">
-              {/* Left: Existing Department SOP List */}
-              <div className="lg:col-span-7 flex flex-col gap-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-slate-200">
-                    Tài liệu Quy chuẩn Huấn luyện (SOP) theo Bộ phận:
+            <div className="p-3.5 flex flex-col gap-3 max-h-[265px] overflow-y-auto">
+              {/* Header Switcher between Department SOPs vs 42 Skills Catalog */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSkillsViewMode('sops')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      skillsViewMode === 'sops'
+                        ? 'bg-amber-400 text-slate-950 shadow'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                    }`}
+                  >
+                    📋 Quy chuẩn SOP theo Bộ phận ({deptSops.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSkillsViewMode('skills_catalog')}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      skillsViewMode === 'skills_catalog'
+                        ? 'bg-amber-400 text-slate-950 shadow'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                    }`}
+                  >
+                    <span>📚 Thư viện 42 Skills & Biểu Mẫu (AccKit Claude)</span>
+                    <span className="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                      Mới
+                    </span>
+                  </button>
+                </div>
+
+                {skillsViewMode === 'skills_catalog' ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm skill, biểu mẫu..."
+                      value={skillSearchQuery}
+                      onChange={(e) => setSkillSearchQuery(e.target.value)}
+                      className="px-2.5 py-0.8 bg-slate-950 text-slate-200 border border-slate-700 rounded-md text-xs w-44 focus:outline-none focus:border-amber-400"
+                    />
+                    {(['all', 'office_12', 'deep_30'] as const).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSkillCategoryFilter(cat)}
+                        className={`px-2 py-0.8 text-[11px] rounded transition-colors whitespace-nowrap cursor-pointer ${
+                          skillCategoryFilter === cat
+                            ? 'bg-sky-500 text-slate-950 font-bold'
+                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        {cat === 'all'
+                          ? 'Tất cả (42)'
+                          : cat === 'office_12'
+                          ? '12 Kỹ năng Văn phòng'
+                          : '30 Skills Chuyên sâu'}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1">
+                ) : (
+                  <div className="flex items-center gap-1 overflow-x-auto max-w-full">
                     {agents.map((ag) => (
                       <button
                         key={ag.departmentId}
                         type="button"
                         onClick={() => setSopDeptId(ag.departmentId)}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`px-2 py-0.8 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                           sopDeptId === ag.departmentId
                             ? 'bg-amber-400 text-slate-950 font-semibold'
                             : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
                         }`}
                       >
-                        {ag.name} ({ag.departmentLabel.split(' ')[0]})
+                        {ag.name.split(' ')[0]} ({ag.slashCommand || ''})
                       </button>
                     ))}
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="space-y-2 overflow-y-auto max-h-[220px] pr-1">
-                  {deptSops.map((doc) => (
+              {/* View 1: 42 Skills & Templates Catalog */}
+              {skillsViewMode === 'skills_catalog' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pr-1 overflow-y-auto max-h-[195px]">
+                  {SKILLS_CATALOG.filter((sk) => {
+                    const matchCat =
+                      skillCategoryFilter === 'all' || sk.category === skillCategoryFilter;
+                    const matchQ =
+                      !skillSearchQuery.trim() ||
+                      sk.name.toLowerCase().includes(skillSearchQuery.toLowerCase()) ||
+                      sk.description.toLowerCase().includes(skillSearchQuery.toLowerCase()) ||
+                      sk.code.toLowerCase().includes(skillSearchQuery.toLowerCase()) ||
+                      sk.assignedAgentName.toLowerCase().includes(skillSearchQuery.toLowerCase());
+                    return matchCat && matchQ;
+                  }).map((sk) => (
                     <div
-                      key={doc.id}
-                      className="p-3 bg-slate-900/80 border border-slate-800 rounded-lg space-y-1.5 text-xs"
+                      key={sk.id}
+                      className="p-2.5 bg-slate-900/90 border border-slate-800 hover:border-amber-400/50 rounded-lg flex flex-col justify-between gap-1.5 text-xs transition-colors group"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-bold text-white">
-                          [{doc.code}] {doc.title}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-mono font-bold text-amber-300 text-[11px]">
+                            {sk.code}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded">
+                            {sk.slashCommand}
+                          </span>
                         </div>
+                        <div className="font-bold text-white text-xs">
+                          {sk.name}
+                        </div>
+                        <p className="text-slate-400 text-[11px] line-clamp-2 leading-relaxed">
+                          {sk.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between gap-1">
+                        <span className="text-[10px] text-slate-400 truncate">
+                          Phụ trách: <strong className="text-slate-200">{sk.assignedAgentName.split(' ')[0]}</strong>
+                        </span>
                         <button
                           type="button"
-                          onClick={() => onToggleSop(doc.id)}
-                          className={`px-2.5 py-0.5 text-[11px] font-semibold rounded border cursor-pointer whitespace-nowrap shrink-0 ${
-                            doc.isActive
-                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
+                          onClick={() => {
+                            setTaskPrompt(sk.samplePrompt);
+                            const assignedAgent = agents.find(
+                              (a) => a.characterKey === sk.assignedAgentKey
+                            );
+                            if (assignedAgent) {
+                              onSelectAgent(assignedAgent.id);
+                              onSelectZone(assignedAgent.zoneId);
+                            }
+                            setActiveTab('tasks');
+                          }}
+                          className="px-2 py-0.5 text-[10px] font-semibold bg-amber-400 hover:bg-amber-300 text-slate-950 rounded shadow cursor-pointer transition-colors whitespace-nowrap"
                         >
-                          {doc.isActive ? 'Đang áp dụng' : 'Tạm tắt'}
+                          ⚡ Giao việc ngay
                         </button>
                       </div>
-                      <p className="text-slate-400 text-[11px]">{doc.summary}</p>
-                      <ul className="space-y-1 text-slate-200 pl-1">
-                        {doc.rules.map((r, i) => (
-                          <li key={i}>• {r}</li>
-                        ))}
-                      </ul>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Right: Add / Upload New Training Document (SOP) */}
-              <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-lg p-3.5">
-                <form onSubmit={handleSopSubmit} className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <FolderPlus className="w-4 h-4 text-amber-400" />
-                      <span>Nạp Tài liệu Huấn luyện SOP Mới</span>
-                    </span>
-                    <label className="text-[11px] text-amber-400 hover:underline cursor-pointer">
-                      <span>Tải file (.txt/.md)</span>
-                      <input
-                        type="file"
-                        accept=".txt,.md,.csv,.json"
-                        onChange={handleFileUploadSop}
-                        className="hidden"
-                      />
-                    </label>
+              ) : (
+                /* View 2: Existing SOP Documents */
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 max-h-[195px] overflow-y-auto">
+                  <div className="lg:col-span-7 space-y-2 pr-1">
+                    {deptSops.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-lg space-y-1 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-white">
+                            [{doc.code}] {doc.title}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onToggleSop(doc.id)}
+                            className={`px-2 py-0.5 text-[10px] font-semibold rounded border cursor-pointer whitespace-nowrap shrink-0 ${
+                              doc.isActive
+                                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {doc.isActive ? 'Đang áp dụng' : 'Tạm tắt'}
+                          </button>
+                        </div>
+                        <p className="text-slate-400 text-[11px]">{doc.summary}</p>
+                        <ul className="space-y-0.5 text-slate-200 pl-1 text-[11px]">
+                          {doc.rules.map((r, i) => (
+                            <li key={i}>• {r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label htmlFor="sop-code-input" className="block text-[11px] text-slate-400 mb-0.5">
-                        Mã SOP
-                      </label>
-                      <input
-                        id="sop-code-input"
-                        type="text"
-                        value={sopCode}
-                        onChange={(e) => setSopCode(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white font-mono"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label htmlFor="sop-title-input" className="block text-[11px] text-slate-400 mb-0.5">
-                        Tên tài liệu quy chuẩn huấn luyện
-                      </label>
-                      <input
-                        id="sop-title-input"
-                        type="text"
-                        placeholder="VD: Quy chuẩn in UV phẳng trên Mica Đài Loan"
-                        value={sopTitle}
-                        onChange={(e) => {
-                          setSopTitle(e.target.value);
-                          if (sopError) setSopError('');
-                        }}
-                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white"
-                      />
-                    </div>
+                  {/* Right Form: Add New Training SOP */}
+                  <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-lg p-3">
+                    <form onSubmit={handleSopSubmit} className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <FolderPlus className="w-4 h-4 text-amber-400" />
+                          <span>Nạp SOP Mới</span>
+                        </span>
+                        <label className="text-[11px] text-amber-400 hover:underline cursor-pointer">
+                          <span>Tải file (.txt/.md)</span>
+                          <input
+                            type="file"
+                            accept=".txt,.md,.csv,.json"
+                            onChange={handleFileUploadSop}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-0.5">Mã SOP</label>
+                          <input
+                            type="text"
+                            value={sopCode}
+                            onChange={(e) => setSopCode(e.target.value)}
+                            className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[10px] text-slate-400 mb-0.5">Tiêu đề</label>
+                          <input
+                            type="text"
+                            value={sopTitle}
+                            onChange={(e) => setSopTitle(e.target.value)}
+                            placeholder="Tên quy chuẩn..."
+                            className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Các quy tắc SOP (mỗi dòng 1 quy tắc)</label>
+                        <textarea
+                          rows={2}
+                          value={sopRulesText}
+                          onChange={(e) => setSopRulesText(e.target.value)}
+                          placeholder="Quy tắc 1...&#10;Quy tắc 2..."
+                          className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-1 bg-amber-400 text-slate-950 font-bold rounded hover:bg-amber-300 transition-colors cursor-pointer text-xs"
+                      >
+                        + Nạp vào Bộ Nhớ Bộ Phận
+                      </button>
+                    </form>
                   </div>
-
-                  <div>
-                    <label htmlFor="sop-rules-input" className="block text-[11px] text-slate-400 mb-0.5">
-                      Các quy tắc bắt buộc thực hiện (mỗi dòng 1 quy chuẩn):
-                    </label>
-                    <textarea
-                      id="sop-rules-input"
-                      rows={3}
-                      placeholder="- Đơn giá in UV phẳng Mica 5mm: 320.000đ/m2&#10;- Bắt buộc in lót trắng (White Ink) với Mica trong suốt"
-                      value={sopRulesText}
-                      onChange={(e) => {
-                        setSopRulesText(e.target.value);
-                        if (sopError) setSopError('');
-                      }}
-                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white"
-                    />
-                  </div>
-
-                  {sopError && (
-                    <p role="alert" className="text-xs text-rose-400">
-                      {sopError}
-                    </p>
-                  )}
-                  {sopSuccess && (
-                    <p role="status" className="text-xs text-emerald-400">
-                      {sopSuccess}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full py-2 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Huấn luyện & Lưu vào Bộ phận Đang chọn
-                  </button>
-                </form>
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

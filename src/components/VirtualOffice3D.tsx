@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   AgentProfile,
+  DoraemonCharacterKey,
   OfficeZone,
   TaskAssignment,
   ZoneId
@@ -1914,6 +1915,11 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
       config: {
         id: string;
         roleLabel: string;
+        characterName?: string;
+        characterKey?: DoraemonCharacterKey;
+        departmentLabel?: string;
+        slashCommand?: string;
+        accentHex?: string;
         suitColor: number;
         pantsColor: number;
         hairColor: number;
@@ -1956,16 +1962,23 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
             hairColor: config.hairColor,
             isFemale: config.isFemale,
             mode: config.mode,
-            staffIndex
+            staffIndex,
+            characterKey: config.characterKey
           },
           bodyGroup
         );
 
-      // Floating dark pill badge for key roles (like "Nghiên cứu từ khoá" in the video)
+      // Floating Anime Pill Badge for Doraemon Staff Character
+      const pillTitle = config.characterName || config.roleLabel;
+      const pillSubtitle = config.slashCommand
+        ? `${config.departmentLabel || 'Nhân sự'} (${config.slashCommand})`
+        : (config.departmentLabel || 'PrintAd Agency · Nhân sự');
+      const pillColor = config.accentHex || '#f59e0b';
+
       const pillTex = createFloatingPillTexture(
-        config.roleLabel,
-        'PrintAd Agency · Nhân sự',
-        '#f59e0b',
+        pillTitle,
+        pillSubtitle,
+        pillColor,
         false
       );
       const labelSprite = new THREE.Sprite(
@@ -1975,9 +1988,9 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
           depthWrite: false
         })
       );
-      labelSprite.position.set(0, 1.92, 0);
-      labelSprite.scale.set(1.55, 0.36, 1);
-      labelSprite.visible = Boolean(config.showFloatingLabel);
+      labelSprite.position.set(0, 2.32, 0);
+      labelSprite.scale.set(1.95, 0.44, 1);
+      labelSprite.visible = config.showFloatingLabel !== false;
       root.add(labelSprite);
 
       // 3D Speech Bubble for NPC conversations
@@ -2046,71 +2059,97 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
       };
     }
 
-    // 12 Agency Staff Configurations (making 5 + 12 = 17 nhân sự total!)
+    // 8 Doraemon Supporting Staff Configurations (9 Department Heads + 8 Staff = exactly 17 Doraemon Characters!)
     const staffConfigs: Parameters<typeof createAgencyStaffMember>[0][] = [
-      // 2 seated at Cafe Bistro Tables chatting face-to-face over coffee
+      // 1. JAIKO — Em gái Chaian (03 - Marketing B2B)
       {
-        id: 'staff-cafe-1',
-        roleLabel: 'Copywriter · Cà phê',
-        suitColor: 0xf8fafc,
-        pantsColor: 0x1e293b,
-        hairColor: 0x1c1917,
-        isFemale: false,
+        id: 'staff-jaiko',
+        characterKey: 'jaiko',
+        characterName: 'Jaiko (Em gái Chaian)',
+        roleLabel: 'Sáng tạo nội dung & Visual Story',
+        departmentLabel: '03 - Marketing B2B',
+        slashCommand: '/mkt',
+        accentHex: '#ec4899',
+        suitColor: 0xf43f5e,
+        pantsColor: 0x881337,
+        hairColor: 0x18181b,
+        isFemale: true,
         mode: 'seated_cafe',
         startPos: [-6.8, 0, 7.8],
         lookAtPos: [-5.1, 0, 7.8],
         partnerLookAt: [-5.1, 0, 7.8],
+        showFloatingLabel: true,
         chatLines: [
-          'Headline chiến dịch POSM mới chốt xong rồi nhé!',
-          'Cà phê sáng nay thơm quá, sẵn sàng chạy brief mới!'
+          'Mình vừa hoàn thiện bản phác thảo bộ Key Visual POSM chuỗi bán lẻ!',
+          'Tone màu pastel rực rỡ và bố cục 3D rất đúng ý anh Chaian duyệt.'
         ]
       },
+      // 2. TAMAKO — Mẹ Nobita (05 - Kế Toán & Chi Phí)
       {
-        id: 'staff-cafe-2',
-        roleLabel: 'Account Executive · Cà phê',
-        suitColor: 0x38bdf8,
-        pantsColor: 0x0f172a,
-        hairColor: 0x451a03,
+        id: 'staff-tamako',
+        characterKey: 'tamako',
+        characterName: 'Tamako (Mẹ Nobita)',
+        roleLabel: 'Kế toán kho & Kiểm soát chứng từ',
+        departmentLabel: '05 - Kế Toán',
+        slashCommand: '/kt',
+        accentHex: '#10b981',
+        suitColor: 0x10b981,
+        pantsColor: 0x1e293b,
+        hairColor: 0x27272a,
         isFemale: true,
         mode: 'seated_cafe',
         startPos: [-5.1, 0, 7.8],
         lookAtPos: [-6.8, 0, 7.8],
         partnerLookAt: [-6.8, 0, 7.8],
+        showFloatingLabel: true,
         chatLines: [
-          'Tuyệt quá! Khách B2B vừa duyệt mẫu Standee cuốn nhôm!',
-          'Lát nữa mình gửi bảng báo giá qua chị Xuka kiểm nhé!'
+          'Đã kiểm tra đối soát 18 hóa đơn đầu vào vật tư Hiflex & Standee!',
+          'Các khoản tạm ứng 50% đơn hàng lớn đều đã vào sổ kế toán Standard Costing.'
         ]
       },
-      // 2 in Game Zone (1 seated on red sofa playing Turbo Kart, 1 roaming & cheering)
+      // 3. SEWASHI — Cháu Nobita thế kỷ 22 (01 - Ban Giám Đốc)
       {
-        id: 'staff-game-1',
-        roleLabel: 'Media Planner · Turbo Kart',
-        suitColor: 0x10b981,
-        pantsColor: 0x1e293b,
-        hairColor: 0x0f172a,
+        id: 'staff-sewashi',
+        characterKey: 'sewashi',
+        characterName: 'Sewashi (Cháu Nobita)',
+        roleLabel: 'Tự động hóa & Dữ liệu 4.0',
+        departmentLabel: '01 - Ban Giám Đốc',
+        slashCommand: '/bgd',
+        accentHex: '#06b6d4',
+        suitColor: 0x06b6d4,
+        pantsColor: 0x0f172a,
+        hairColor: 0x1e293b,
         isFemale: false,
         mode: 'seated_game',
         startPos: [10.3, 0, 4.3],
         lookAtPos: [10.3, 0, 1.5],
         partnerLookAt: [12.9, 0, 4.1],
+        showFloatingLabel: true,
         chatLines: [
-          'Cua gấp khúc Turbo Kart mượt quá! Sắp phá kỷ lục rồi!',
-          'Giải lao 10 phút nạp năng lượng chiều tối ưu ADS!'
+          'Dashboard phân tích hiệu suất 8 Sub-Agents đang vận hành tối ưu!',
+          'Thuật toán dự báo nhu cầu in ấn tuần tới đạt độ chính xác 96.5%!'
         ]
       },
+      // 4. SUNETSUGU — Em họ Suneo New York (02 - Kinh Doanh B2B)
       {
-        id: 'staff-game-2',
-        roleLabel: '3D Visualizer · Arcade',
-        suitColor: 0xa855f7,
-        pantsColor: 0x18181b,
-        hairColor: 0x27272a,
-        isFemale: true,
+        id: 'staff-sunetsugu',
+        characterKey: 'sunetsugu',
+        characterName: 'Sunetsugu (Em họ Suneo)',
+        roleLabel: 'Pháp chế & Hợp đồng B2B',
+        departmentLabel: '02 - Kinh Doanh B2B',
+        slashCommand: '/kd',
+        accentHex: '#3b82f6',
+        suitColor: 0x3b82f6,
+        pantsColor: 0x1e293b,
+        hairColor: 0x18181b,
+        isFemale: false,
         mode: 'walker',
         startPos: [12.9, 0, 4.1],
         lookAtPos: [10.3, 0, 4.3],
+        showFloatingLabel: true,
         chatLines: [
-          'Cố lên! Vòng cuối Turbo Kart kìa!',
-          'Mình vừa render xong phối cảnh Booth sự kiện 3D!'
+          'Hợp đồng nguyên tắc cung cấp POSM với chuỗi bán lẻ quốc tế đã hoàn tất!',
+          'Các điều khoản SLA bảo hành màu sắc và thời gian giao hàng rất chặt chẽ.'
         ],
         waypoints: [
           { pos: [12.2, 0, 4.1], activity: 'game' },
@@ -2119,108 +2158,95 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
           { pos: [13.5, 0, 4.1], activity: 'game' }
         ]
       },
-      // 3 Seated at Workstation Clusters + 1 Roaming Tech Coordinator
+      // 5. MINI-DORA ĐỎ — Kỹ Thuật Chế Bản & Preflight CMYK
       {
-        id: 'staff-work-1',
-        roleLabel: 'Kỹ thuật DTP & Bình bài',
-        suitColor: 0x334155,
-        pantsColor: 0x0f172a,
-        hairColor: 0x18181b,
+        id: 'staff-minidora-red',
+        characterKey: 'minidora_red',
+        characterName: 'Mini-Dora Đỏ',
+        roleLabel: 'Kỹ thuật chế bản & In Proof CMYK',
+        departmentLabel: 'Kỹ Thuật Chế Bản',
+        slashCommand: '/tk',
+        accentHex: '#ef4444',
+        suitColor: 0xef4444,
+        pantsColor: 0xef4444,
+        hairColor: 0xef4444,
         isFemale: false,
         mode: 'seated_work',
         startPos: [-9.75, 0, 0.25],
         lookAtPos: [-9.75, 0, 1.3],
         partnerLookAt: [-7.2, 0, 1.8],
+        showFloatingLabel: true,
         chatLines: [
-          'Đã bình bài xong 80m² bạt Hiflex 3.2 dzem chuẩn CMYK!',
-          'File in đã bù tràn lề 3mm và gắn ốc chồng màu!'
+          'Poko poko! Đã kiểm tra 300 DPI, bù tràn lề 3mm cho file anh Nobita!',
+          'Bản in proof test màu ISO Coated v2 đạt độ lệch Delta-E < 1.0!'
         ]
       },
+      // 6. NOBISUKE — Bố Nobita (02 - Kinh Doanh B2B)
       {
-        id: 'staff-work-2',
-        roleLabel: 'Chuyên viên SEO · AEO',
-        suitColor: 0xf43f5e,
+        id: 'staff-nobisuke',
+        characterKey: 'nobisuke',
+        characterName: 'Nobisuke (Bố Nobita)',
+        roleLabel: 'Chuyên viên Đàm phán Hợp đồng B2B',
+        departmentLabel: '02 - Kinh Doanh B2B',
+        slashCommand: '/kd',
+        accentHex: '#3b82f6',
+        suitColor: 0x475569,
         pantsColor: 0x1e293b,
-        hairColor: 0x3f2314,
-        isFemale: true,
+        hairColor: 0x18181b,
+        isFemale: false,
         mode: 'seated_work',
         startPos: [2.65, 0, 4.15],
         lookAtPos: [2.65, 0, 5.2],
         partnerLookAt: [4.55, 0, 6.25],
+        showFloatingLabel: true,
         chatLines: [
-          'Từ khoá "in bạt quảng cáo lấy ngay" lên Top 1 rồi!',
-          'Traffic tự nhiên từ AEO tăng 42% tuần này!'
+          'Khách hàng B2B chuỗi nhà hàng vừa đồng ý ký hợp đồng in bạt 500m²!',
+          'Anh Dekisugi để bố chuẩn bị sẵn phụ lục đơn giá ưu đãi nhé!'
         ]
       },
+      // 7. MINI-DORA VÀNG — Kho Bãi & Mua Hàng FIFO
       {
-        id: 'staff-work-3',
-        roleLabel: 'Chuyên viên Content & Báo giá',
-        suitColor: 0xf8fafc,
-        pantsColor: 0x1e293b,
-        hairColor: 0x1c1917,
+        id: 'staff-minidora-yellow',
+        characterKey: 'minidora_yellow',
+        characterName: 'Mini-Dora Vàng',
+        roleLabel: 'Điều phối Kho & Mã vạch QR FIFO',
+        departmentLabel: '07 - Kho Bãi & Mua Hàng',
+        slashCommand: '/kho',
+        accentHex: '#eab308',
+        suitColor: 0xfacc15,
+        pantsColor: 0xfacc15,
+        hairColor: 0xfacc15,
         isFemale: false,
         mode: 'seated_work',
         startPos: [4.55, 0, 6.25],
         lookAtPos: [4.55, 0, 5.2],
         partnerLookAt: [2.65, 0, 4.15],
-        chatLines: [
-          'Mình vừa soạn xong mẫu Catalog Offset gửi chị Xuka duyệt!',
-          'Khách vừa khen bộ nhận diện POSM mới đẹp lắm!'
-        ]
-      },
-      {
-        id: 'staff-work-4',
-        roleLabel: 'Kế toán Thanh toán',
-        suitColor: 0x0ea5e9,
-        pantsColor: 0x0f172a,
-        hairColor: 0x1c1917,
-        isFemale: true,
-        mode: 'seated_work',
-        startPos: [4.55, 0, -5.25],
-        lookAtPos: [4.55, 0, -4.2],
-        partnerLookAt: [5.2, 0, -3.2],
-        chatLines: [
-          'Đã khớp lệnh tạm ứng 50% của 14 đơn hàng hôm nay!',
-          'Hóa đơn GTGT VAT 8% đã phát hành điện tử đầy đủ!'
-        ]
-      },
-      // 4 Autonomous Walking Staff strolling & socializing between Cafe, Lounge, Kỹ Thuật & SEO
-      {
-        id: 'staff-walk-1',
-        roleLabel: 'Nghiên cứu từ khoá',
-        suitColor: 0xd97706,
-        pantsColor: 0x1e293b,
-        hairColor: 0x451a03,
-        isFemale: true,
-        mode: 'walker',
-        startPos: [-4.2, 0, 3.8],
-        lookAtPos: [0.5, 0, 4.2],
         showFloatingLabel: true,
         chatLines: [
-          'Chào mọi người! Bộ từ khoá in UV Mica đang tăng trưởng mạnh!',
-          'Mình ghé Lounge trao đổi kế hoạch Content với team nhé!'
-        ],
-        waypoints: [
-          { pos: [-4.2, 0, 3.8], activity: 'walk' },
-          { pos: [-1.4, 0, 3.2], activity: 'walk' },
-          { pos: [-3.4, 0, 7.2], activity: 'cafe' },
-          { pos: [1.2, 0, 3.4], activity: 'work' },
-          { pos: [-5.5, 0, 2.2], activity: 'work' }
+          'Poko poko! Lô phôi bạt nhập sáng nay đã dán tem QR theo chuẩn FIFO!',
+          'Bác Kaminari yên tâm, tồn kho an toàn luôn đảm bảo cho đơn gấp.'
         ]
       },
+      // 8. GODA MOM — Mẹ Chaian (08 - Hành Chính & EHS 5S)
       {
-        id: 'staff-walk-2',
-        roleLabel: 'Điều phối Sản xuất In',
-        suitColor: 0x1e293b,
-        pantsColor: 0x0f172a,
+        id: 'staff-goda-mom',
+        characterKey: 'goda_mom',
+        characterName: 'Mẹ Chaian (Bà chủ Goda)',
+        roleLabel: 'Giám sát Hiện trường 5S & BHLĐ',
+        departmentLabel: '08 - Hành Chính & EHS',
+        slashCommand: '/hc',
+        accentHex: '#0d9488',
+        suitColor: 0x0d9488,
+        pantsColor: 0x1e293b,
         hairColor: 0x18181b,
-        isFemale: false,
+        isFemale: true,
         mode: 'walker',
         startPos: [-0.8, 0, 2.5],
         lookAtPos: [-6.5, 0, 5.5],
+        showFloatingLabel: true,
         chatLines: [
-          'Máy in phun khổ lớn số 2 vừa hoàn tất lô 80m² bạt!',
-          'Anh em Kỹ thuật chuẩn bị đóng khoen dán biên giao khách nhé!'
+          'Khu vực máy in và gia công cắt bạt phải luôn giữ sạch sẽ 5S!',
+          'Bình PCCC và lối thoát hiểm đã được kiểm tra nghiêm ngặt đạt 100%!'
         ],
         waypoints: [
           { pos: [-0.8, 0, 2.5], activity: 'walk' },
@@ -2228,49 +2254,6 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
           { pos: [-7.2, 0, 5.8], activity: 'cafe' },
           { pos: [-1.8, 0, -0.4], activity: 'walk' },
           { pos: [2.4, 0, 1.8], activity: 'work' }
-        ]
-      },
-      {
-        id: 'staff-walk-3',
-        roleLabel: 'Kiểm soát Chất lượng CMYK',
-        suitColor: 0xeab308,
-        pantsColor: 0x1e293b,
-        hairColor: 0x1c1917,
-        isFemale: true,
-        mode: 'walker',
-        startPos: [1.5, 0, -1.2],
-        lookAtPos: [7.5, 0, 2.5],
-        chatLines: [
-          'Bản in test màu chuẩn ISO Coated v2 đạt 100% rồi!',
-          'Độ lệch màu Delta-E < 1.2, duyệt xuất xưởng luôn!'
-        ],
-        waypoints: [
-          { pos: [1.5, 0, -1.2], activity: 'walk' },
-          { pos: [-1.2, 0, 1.4], activity: 'work' },
-          { pos: [6.8, 0, 2.4], activity: 'game' },
-          { pos: [2.5, 0, 2.8], activity: 'walk' },
-          { pos: [-3.5, 0, -3.5], activity: 'work' }
-        ]
-      },
-      {
-        id: 'staff-walk-4',
-        roleLabel: 'Chuyên viên Khách hàng B2B',
-        suitColor: 0x6366f1,
-        pantsColor: 0x1e293b,
-        hairColor: 0x18181b,
-        isFemale: false,
-        mode: 'walker',
-        startPos: [-6.5, 0, -2.5],
-        lookAtPos: [-2.5, 0, -1.5],
-        chatLines: [
-          'Chuỗi siêu thị vừa đặt thêm 30 bộ Standee cuốn nhôm!',
-          'Để mình qua báo Suneo cập nhật hợp đồng đối tác B2B!'
-        ],
-        waypoints: [
-          { pos: [-6.5, 0, -2.5], activity: 'work' },
-          { pos: [-2.2, 0, 1.2], activity: 'walk' },
-          { pos: [-3.2, 0, 6.8], activity: 'cafe' },
-          { pos: [1.6, 0, -1.8], activity: 'work' }
         ]
       }
     ];

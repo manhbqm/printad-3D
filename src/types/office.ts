@@ -7,13 +7,21 @@ export type ZoneId =
   | 'accounting'
   | 'design_tech'
   | 'marketing'
-  | 'hr_ops';
+  | 'hr_ops'
+  | 'warehouse_supply'
+  | 'admin_ehs';
 
 export type DepartmentId =
-  | 'sales_quoting'
-  | 'accounting'
-  | 'design_tech'
+  | 'board_executive'
+  | 'sales_b2b'
   | 'marketing'
+  | 'customer_service'
+  | 'accounting'
+  | 'human_resources'
+  | 'warehouse_supply'
+  | 'administration_ehs'
+  | 'design_tech'
+  | 'sales_quoting'
   | 'hr_ops';
 
 export interface Vector3Tuple {
@@ -63,7 +71,19 @@ export type DoraemonCharacterKey =
   | 'shizuka'
   | 'suneo'
   | 'nobita'
-  | 'chaian';
+  | 'chaian'
+  | 'dekisugi'
+  | 'dorami'
+  | 'jaiko'
+  | 'kaminari'
+  | 'sensei'
+  | 'tamako'
+  | 'nobisuke'
+  | 'minidora_red'
+  | 'minidora_yellow'
+  | 'sewashi'
+  | 'sunetsugu'
+  | 'goda_mom';
 
 export interface AgentProfile {
   id: string;
@@ -76,12 +96,23 @@ export interface AgentProfile {
   accentHex: string;
   suitColorHex: number;
   hairColorHex: number;
-  accessoryType: 'glasses' | 'headset' | 'visor' | 'badge' | 'clipboard';
+  accessoryType:
+    | 'glasses'
+    | 'headset'
+    | 'visor'
+    | 'badge'
+    | 'clipboard'
+    | 'bow'
+    | 'beret'
+    | 'tie';
   primaryMission: string;
   strictBoundary: string;
   personalityTraits: string[];
   spatialBehavior: string;
   allowedKeywords: string[];
+  slashCommand?: string;
+  skills?: string[];
+  subAgentModule?: string;
   homePosition: Vector3Tuple;
   workstationLookAt: Vector3Tuple;
   collaborationPoint: Vector3Tuple;
@@ -114,6 +145,19 @@ export interface CoordinatorDispatchInfo {
   supportingDepartments: string[];
 }
 
+export interface FormalDocument {
+  id: string;
+  documentType: 'contract' | 'delivery_note' | 'quotation' | 'b2b_email' | 'meeting_minutes' | 'complaint_8d' | 'iso_sop' | 'kanban_tracking' | 'company_profile' | 'general';
+  title: string;
+  documentNumber: string;
+  issueDate: string;
+  parties?: {
+    partyA: string;
+    partyB: string;
+  };
+  content: string;
+}
+
 export interface TaskReport {
   headline: string;
   summary: string;
@@ -124,6 +168,7 @@ export interface TaskReport {
   keyFindings: string[];
   calculationRows?: CalculationRow[];
   totalAmountFormatted?: string;
+  formalDocument?: FormalDocument;
   recommendation: string;
   executionTimeSec: number;
   sourceMode: 'gemini-api' | 'sop-engine';
@@ -147,18 +192,51 @@ export interface TaskAssignment {
   coordinatorDispatch?: CoordinatorDispatchInfo;
 }
 
+export type PrintQuoteProductType =
+  | 'hiflex'
+  | 'decal_pp'
+  | 'mica_led'
+  | 'standee'
+  | 'catalog_offset'
+  | 'flyer'
+  | 'catalogue'
+  | 'bag'
+  | 'folder'
+  | 'envelope'
+  | 'lixi'
+  | 'uv_dtf';
+
 export interface PrintQuoteInput {
-  materialType: 'hiflex' | 'decal_pp' | 'mica_led' | 'standee' | 'catalog_offset';
+  materialType: PrintQuoteProductType;
   widthMeters: number;
   heightMeters: number;
   quantity: number;
-  finishingOption: 'none' | 'eyelet_glue' | 'matte_lamination' | 'alu_frame';
+  finishingOption:
+    | 'none'
+    | 'eyelet_glue'
+    | 'matte_lamination'
+    | 'alu_frame'
+    | 'glossy_lamination'
+    | 'gluing'
+    | 'die_cut'
+    | 'saddle_stitch'
+    | 'perfect_bind';
   rushOrder: boolean;
+  paperId?: string;
+  paperName?: string;
+  printSides?: 1 | 2;
+  printColors?: number;
+  totalPages?: number;
+  bindingType?: 'saddleStitch' | 'perfectBind' | 'hardCover';
+  bagDepthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 export interface PrintQuoteResult {
   areaSqmPerUnit: number;
   totalAreaSqm: number;
+  baseCost?: number;
   baseUnitRateVnd: number;
   finishingCostVnd: number;
   discountPercent: number;
@@ -167,4 +245,29 @@ export interface PrintQuoteResult {
   vatVnd: number;
   grandTotalVnd: number;
   appliedSopRule: string;
+  machineName?: string;
+  paperName?: string;
+  unitPriceVnd?: number;
+  paperCostVnd?: number;
+  printingCostVnd?: number;
+  profitVnd?: number;
+  productsPerSheet?: number;
+  totalSheets?: number;
+  wasteSheets?: number;
+  printStyle?: string;
+  cloudAppUrl?: string;
+}
+
+export interface SkillCatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  category: 'office_12' | 'deep_30' | 'department_8';
+  categoryLabel: string;
+  assignedAgentName: string;
+  assignedAgentKey: DoraemonCharacterKey;
+  slashCommand: string;
+  description: string;
+  samplePrompt: string;
+  templateFileName?: string;
 }

@@ -404,13 +404,16 @@ export default function App() {
                       setShowLiveResultCard(false);
                       handleSelectAgent(ag.id);
                     }}
-                    className={`px-2 py-0.5 text-[11px] font-medium rounded border cursor-pointer transition-colors ${
+                    className={`px-2 py-0.5 text-[11px] font-medium rounded border cursor-pointer transition-colors flex items-center gap-1 ${
                       isFocused
                         ? 'bg-sky-400 text-neutral-950 border-sky-300 font-bold'
                         : 'bg-neutral-900 text-neutral-300 border-neutral-700 hover:text-white'
                     }`}
                   >
-                    {shortName}
+                    <span>{shortName}</span>
+                    {ag.slashCommand && (
+                      <span className="text-[10px] font-mono opacity-80">{ag.slashCommand}</span>
+                    )}
                   </button>
                 );
               })}

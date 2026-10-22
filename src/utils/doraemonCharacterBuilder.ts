@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AgentProfile } from '../types/office';
+import { AgentProfile, DoraemonCharacterKey } from '../types/office';
 
 export interface BuiltCharacterParts {
   leftLeg: THREE.Object3D;
@@ -1540,7 +1540,7 @@ export function buildDetailedDoraemonCharacter(
     });
 
     bodyGroup.add(headGroup);
-  } else {
+  } else if (agent.characterKey === 'chaian') {
     // =========================================================================
     // 5. CHAIAN (CHAIEN) — PHỤ TRÁCH MARKETING & PHÁT TRIỂN THỊ TRƯỜNG
     // Heroic V-Taper Muscular Physique, Zigzag Orange Jersey, Wristbands & Megaphone
@@ -1728,6 +1728,822 @@ export function buildDetailedDoraemonCharacter(
     });
 
     bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'dorami') {
+    // =========================================================================
+    // 6. DORAMI (ĐÔ-RÊ-MI) — TRƯỞNG PHÒNG NHÂN SỰ & QUẢN TRỊ LAO ĐỘNG
+    // Yellow Cat-Robot, Iconic Red Bow Ears, Plaid Pocket & Daisy Tail
+    // =========================================================================
+    bodyGroup.scale.set(0.95, 0.95, 0.95);
+    const doramiYellowTex = createFabricTexture('#facc15', '#eab308', 'glossy_dora');
+    const doramiYellowMat = new THREE.MeshPhysicalMaterial({
+      map: doramiYellowTex,
+      color: 0xfacc15,
+      roughness: 0.22,
+      metalness: 0.08,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.15
+    });
+
+    leftLeg.position.set(-0.16, 0.42, 0);
+    rightLeg.position.set(0.16, 0.42, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const hip = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 12), doramiYellowMat);
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.105, 0.24, 16), doramiYellowMat);
+      cyl.position.y = -0.12;
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.145, 18, 14), pureWhiteMat);
+      paw.scale.set(1.05, 0.6, 1.35);
+      paw.position.set(0, -0.28, 0.04);
+      paw.castShadow = true;
+      legGrp.add(hip, cyl, paw);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const doramiTorsoPts = [
+      new THREE.Vector2(0.01, -0.36),
+      new THREE.Vector2(0.26, -0.32),
+      new THREE.Vector2(0.33, -0.1),
+      new THREE.Vector2(0.32, 0.18),
+      new THREE.Vector2(0.14, 0.35)
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(doramiTorsoPts, 28), doramiYellowMat);
+    torso.scale.set(1.05, 1.0, 0.92);
+    torso.position.set(0, 0.9, 0);
+    torso.castShadow = true;
+    interactableMeshes.push(torso);
+    bodyGroup.add(torso);
+
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 16), pureWhiteMat);
+    belly.scale.set(0.92, 0.98, 0.36);
+    belly.position.set(0, 0.88, 0.23);
+    bodyGroup.add(belly);
+
+    const plaidPocketMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+    const pocket = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 0.02, 20, 1, false, 0, Math.PI),
+      plaidPocketMat
+    );
+    pocket.rotation.x = Math.PI / 2;
+    pocket.rotation.z = Math.PI;
+    pocket.position.set(0, 0.84, 0.31);
+    bodyGroup.add(pocket);
+
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 12, 24), redAccentMat);
+    collar.rotation.x = Math.PI / 2 + 0.05;
+    collar.position.set(0, 1.25, 0.02);
+    bodyGroup.add(collar);
+
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 12), goldMat);
+    bell.position.set(0, 1.19, 0.185);
+    bodyGroup.add(bell);
+
+    tailGroup = new THREE.Group();
+    tailGroup.position.set(0, 0.65, -0.32);
+    const tailStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.08, 8), doramiYellowMat);
+    tailStem.rotation.x = Math.PI / 3;
+    const flowerCenter = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), goldMat);
+    flowerCenter.position.set(0, 0.03, -0.05);
+    tailGroup.add(tailStem, flowerCenter);
+    bodyGroup.add(tailGroup);
+
+    leftArm.position.set(-0.31, 1.15, 0);
+    rightArm.position.set(0.31, 1.15, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), doramiYellowMat);
+      const armCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.065, 0.22, 14), doramiYellowMat);
+      armCyl.position.y = -0.11;
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.082, 16, 12), pureWhiteMat);
+      paw.position.set(0, -0.25, isRight ? 0.03 : 0);
+      armGrp.add(sh, armCyl, paw);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.58, 0);
+    const headSphere = new THREE.Mesh(new THREE.SphereGeometry(0.36, 26, 22), doramiYellowMat);
+    headSphere.scale.set(1.06, 0.96, 0.95);
+    headSphere.castShadow = true;
+    headGroup.add(headSphere);
+
+    const faceMask = new THREE.Mesh(new THREE.SphereGeometry(0.29, 24, 20), pureWhiteMat);
+    faceMask.scale.set(1.0, 0.88, 0.52);
+    faceMask.position.set(0, -0.06, 0.21);
+    headGroup.add(faceMask);
+
+    [-0.085, 0.085].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x0284c7, 1.1, true);
+      eye.position.set(xEye, 0.03, 0.35);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.032, 14, 12), redAccentMat);
+    nose.position.set(0, -0.015, 0.385);
+    headGroup.add(nose);
+
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.006, 8, 18, Math.PI * 0.8), smileMouthMat);
+    smile.rotation.z = Math.PI * 1.1;
+    smile.position.set(0, -0.09, 0.37);
+    headGroup.add(smile);
+
+    const bowCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12), redAccentMat);
+    bowCenter.rotation.x = Math.PI / 2;
+    bowCenter.position.set(0, 0.34, -0.04);
+    headGroup.add(bowCenter);
+
+    [-1, 1].forEach((side) => {
+      const bowLoop = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.04, 10, 20, Math.PI * 1.4), redAccentMat);
+      bowLoop.rotation.y = side * 0.25;
+      bowLoop.rotation.z = side * 0.65;
+      bowLoop.position.set(side * 0.15, 0.38, -0.04);
+      headGroup.add(bowLoop);
+    });
+
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'minidora_red' || agent.characterKey === 'minidora_yellow') {
+    // =========================================================================
+    // MINI-DORA (RED / YELLOW) — TRỢ LÝ R&D VÀ KIỂM KÊ KHO TÍ HON
+    // Petite Cat-Robot (0.72x), Rotating Bamboo-Copter, Whiskers & Gold Bell
+    // =========================================================================
+    bodyGroup.scale.setScalar(0.72);
+    const isRed = agent.characterKey === 'minidora_red';
+    const miniColor = isRed ? 0xef4444 : 0xfacc15;
+    const miniMat = new THREE.MeshPhysicalMaterial({
+      color: miniColor,
+      roughness: 0.24,
+      metalness: 0.08,
+      clearcoat: 0.6
+    });
+
+    leftLeg.position.set(-0.14, 0.38, 0);
+    rightLeg.position.set(0.14, 0.38, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const hip = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), miniMat);
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), pureWhiteMat);
+      paw.scale.set(1.05, 0.6, 1.35);
+      paw.position.set(0, -0.22, 0.04);
+      legGrp.add(hip, paw);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torso = new THREE.Mesh(new THREE.SphereGeometry(0.28, 22, 18), miniMat);
+    torso.position.set(0, 0.72, 0);
+    interactableMeshes.push(torso);
+    bodyGroup.add(torso);
+
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 14), pureWhiteMat);
+    belly.scale.set(0.9, 0.9, 0.35);
+    belly.position.set(0, 0.71, 0.18);
+    bodyGroup.add(belly);
+
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 10, 20), isRed ? pureWhiteMat : redAccentMat);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 0.98, 0.02);
+    bodyGroup.add(collar);
+
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 10), goldMat);
+    bell.position.set(0, 0.94, 0.16);
+    bodyGroup.add(bell);
+
+    leftArm.position.set(-0.25, 0.88, 0);
+    rightArm.position.set(0.25, 0.88, 0);
+    [leftArm, rightArm].forEach((armGrp) => {
+      const armCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.18, 12), miniMat);
+      armCyl.position.y = -0.09;
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 10), pureWhiteMat);
+      paw.position.set(0, -0.2, 0);
+      armGrp.add(armCyl, paw);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.28, 0);
+    const headSphere = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 20), miniMat);
+    headSphere.scale.set(1.05, 0.95, 0.95);
+    headGroup.add(headSphere);
+
+    const faceMask = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), pureWhiteMat);
+    faceMask.scale.set(1.0, 0.88, 0.5);
+    faceMask.position.set(0, -0.04, 0.17);
+    headGroup.add(faceMask);
+
+    [-0.07, 0.07].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.9, false);
+      eye.position.set(xEye, 0.03, 0.28);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10), redAccentMat);
+    nose.position.set(0, -0.01, 0.31);
+    headGroup.add(nose);
+
+    propellerGroup = new THREE.Group();
+    propellerGroup.position.set(0, 0.3, 0);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.1, 8), goldMat);
+    shaft.position.y = 0.05;
+    const blades = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.01, 0.04), goldMat);
+    blades.position.y = 0.1;
+    propellerGroup.add(shaft, blades);
+    headGroup.add(propellerGroup);
+
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'dekisugi') {
+    // =========================================================================
+    // 7. DEKISUGI (ĐÊ-KHI) — TRƯỞNG PHÒNG KINH DOANH B2B & QUẢN TRỊ DỰ ÁN
+    // Pastel Blue Shirt, Navy Tie, Tailored Slacks & Leather Portfolio
+    // =========================================================================
+    const shirtBlueMat = new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, roughness: 0.38, sheen: 0.4 });
+    const slacksMat = new THREE.MeshPhysicalMaterial({ color: 0x334155, roughness: 0.52 });
+    const tieMat = new THREE.MeshPhysicalMaterial({ color: 0x1e3a8a, roughness: 0.28 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x1e293b, roughness: 0.32, clearcoat: 0.5 });
+    const briefcaseMat = new THREE.MeshPhysicalMaterial({ color: 0x78350f, roughness: 0.25, metalness: 0.2 });
+
+    leftLeg.position.set(-0.11, 0.64, 0);
+    rightLeg.position.set(0.11, 0.64, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.078, 0.32, 16), slacksMat);
+      thigh.position.y = -0.16;
+      const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.076, 0.068, 0.3, 16), slacksMat);
+      shin.position.y = -0.45;
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, goldMat, 'oxford');
+      shoe.position.set(0, -0.63, 0);
+      legGrp.add(thigh, shin, shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torsoPts = [
+      new THREE.Vector2(0.16, -0.28),
+      new THREE.Vector2(0.155, -0.08),
+      new THREE.Vector2(0.19, 0.12),
+      new THREE.Vector2(0.185, 0.26),
+      new THREE.Vector2(0.1, 0.32)
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoPts, 28), shirtBlueMat);
+    torso.scale.set(1.04, 1.0, 0.8);
+    torso.position.set(0, 1.0, 0);
+    torso.castShadow = true;
+    bodyGroup.add(torso);
+
+    const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.17, 0.15, 20), slacksMat);
+    pelvis.scale.set(1.04, 1, 0.8);
+    pelvis.position.set(0, 0.68, 0);
+    bodyGroup.add(pelvis);
+
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 8, 20), pureWhiteMat);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 1.3, 0.02);
+    bodyGroup.add(collar);
+
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.28, 0.015), tieMat);
+    tie.position.set(0, 1.15, 0.17);
+    bodyGroup.add(tie);
+
+    leftArm.position.set(-0.25, 1.25, 0);
+    rightArm.position.set(0.25, 1.25, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.44, 14), shirtBlueMat);
+      arm.position.y = -0.22;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.48, 0);
+      armGrp.add(arm, hand);
+    });
+
+    const briefcase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.28), briefcaseMat);
+    briefcase.position.set(0.06, -0.46, 0.08);
+    rightArm.add(briefcase);
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.56, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.22);
+    headGroup.add(head);
+
+    [-0.07, 0.07].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x1e3a8a, 0.95, false);
+      eye.position.set(xEye, 0.025, 0.195);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const hairDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.225, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.46),
+      darkHairMat
+    );
+    hairDome.rotation.x = -0.35;
+    hairDome.position.set(0, 0.035, -0.02);
+    headGroup.add(hairDome);
+
+    const partLock = createHairStrand(
+      [
+        new THREE.Vector3(-0.06, 0.2, 0.08),
+        new THREE.Vector3(0.04, 0.16, 0.18),
+        new THREE.Vector3(0.12, 0.11, 0.19)
+      ],
+      0.025,
+      darkHairMat
+    );
+    headGroup.add(partLock);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'kaminari') {
+    // =========================================================================
+    // 8. BÁC KAMINARI (BÁC SẤM SÉT) — TRƯỞNG PHÒNG QUẢN LÝ KHO & MUA HÀNG
+    // Japanese Samue Work Coat, Gray Mustache, Bald Crown & Warehouse Clipboard
+    // =========================================================================
+    const samueMat = new THREE.MeshPhysicalMaterial({ color: 0x475569, roughness: 0.6 });
+    const sashMat = new THREE.MeshPhysicalMaterial({ color: 0x1e293b, roughness: 0.4 });
+    const grayHairMat = new THREE.MeshPhysicalMaterial({ color: 0x94a3b8, roughness: 0.45 });
+    const boardMat = new THREE.MeshPhysicalMaterial({ color: 0xb45309, roughness: 0.35 });
+
+    leftLeg.position.set(-0.13, 0.62, 0);
+    rightLeg.position.set(0.13, 0.62, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const legCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.085, 0.46, 16), samueMat);
+      legCyl.position.y = -0.23;
+      const foot = createSculptedShoe(darkMetalMat, pureWhiteMat, grayHairMat, 'boot');
+      foot.position.set(0, -0.58, 0);
+      legGrp.add(legCyl, foot);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torsoPts = [
+      new THREE.Vector2(0.2, -0.32),
+      new THREE.Vector2(0.21, -0.1),
+      new THREE.Vector2(0.24, 0.12),
+      new THREE.Vector2(0.23, 0.28),
+      new THREE.Vector2(0.13, 0.34)
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoPts, 28), samueMat);
+    torso.scale.set(1.08, 1, 0.88);
+    torso.position.set(0, 0.98, 0);
+    torso.castShadow = true;
+    bodyGroup.add(torso);
+
+    const sash = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.12, 24), sashMat);
+    sash.scale.set(1.09, 1, 0.89);
+    sash.position.set(0, 0.88, 0);
+    bodyGroup.add(sash);
+
+    leftArm.position.set(-0.29, 1.25, 0);
+    rightArm.position.set(0.29, 1.25, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.08, 0.38, 14), samueMat);
+      sleeve.position.y = -0.19;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.45, 0);
+      armGrp.add(sleeve, hand);
+    });
+
+    const clipboard = new THREE.Group();
+    clipboard.position.set(0.05, -0.42, 0.12);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.24, 0.18), boardMat);
+    const paper = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.21, 0.15), pureWhiteMat);
+    paper.position.x = 0.012;
+    clipboard.add(board, paper);
+    rightArm.add(clipboard);
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.58, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.24);
+    headGroup.add(head);
+
+    [-0.075, 0.075].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x1c1917, 0.92, false);
+      eye.position.set(xEye, 0.02, 0.21);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.035), grayHairMat);
+    mustache.position.set(0, -0.045, 0.23);
+    headGroup.add(mustache);
+
+    [-1, 1].forEach((side) => {
+      const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 10), grayHairMat);
+      tuft.scale.set(0.5, 1.2, 0.8);
+      tuft.position.set(side * 0.22, 0.04, -0.02);
+      headGroup.add(tuft);
+    });
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'sensei') {
+    // =========================================================================
+    // 9. THẦY GIÁO CHỦ NHIỆM (SENSEI) — TRƯỞNG PHÒNG HÀNH CHÍNH & AN TOÀN EHS
+    // Charcoal Suit, Teacher Glasses, Red Directive Register Folder
+    // =========================================================================
+    const suitMat = new THREE.MeshPhysicalMaterial({ color: 0x475569, roughness: 0.42 });
+    const redBookMat = new THREE.MeshPhysicalMaterial({ color: 0xb91c1c, roughness: 0.3 });
+
+    leftLeg.position.set(-0.11, 0.64, 0);
+    rightLeg.position.set(0.11, 0.64, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.48, 16), suitMat);
+      cyl.position.y = -0.24;
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, goldMat, 'oxford');
+      shoe.position.set(0, -0.62, 0);
+      legGrp.add(cyl, shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torsoPts = [
+      new THREE.Vector2(0.17, -0.3),
+      new THREE.Vector2(0.165, -0.1),
+      new THREE.Vector2(0.2, 0.12),
+      new THREE.Vector2(0.19, 0.28),
+      new THREE.Vector2(0.11, 0.34)
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoPts, 28), suitMat);
+    torso.scale.set(1.05, 1, 0.82);
+    torso.position.set(0, 1.0, 0);
+    bodyGroup.add(torso);
+
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 8, 20), pureWhiteMat);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 1.3, 0.02);
+    bodyGroup.add(collar);
+
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.26, 0.015), redAccentMat);
+    tie.position.set(0, 1.15, 0.17);
+    bodyGroup.add(tie);
+
+    leftArm.position.set(-0.27, 1.25, 0);
+    rightArm.position.set(0.27, 1.25, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.42, 14), suitMat);
+      sleeve.position.y = -0.21;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.47, 0);
+      armGrp.add(sleeve, hand);
+    });
+
+    const redBook = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.18), redBookMat);
+    redBook.position.set(0.05, -0.44, 0.08);
+    rightArm.add(redBook);
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.58, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.23);
+    headGroup.add(head);
+
+    [-0.075, 0.075].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.92, false);
+      eye.position.set(xEye, 0.02, 0.2);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.055, 0.02), darkMetalMat);
+    glasses.position.set(0, 0.02, 0.22);
+    headGroup.add(glasses);
+
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.235, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.44),
+      darkMetalMat
+    );
+    hairCap.rotation.x = -0.35;
+    hairCap.position.set(0, 0.04, -0.02);
+    headGroup.add(hairCap);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'jaiko') {
+    // =========================================================================
+    // 10. JAIKO (CHAIKO) — CHUYÊN VIÊN SÁNG TẠO NỘI DUNG & PROFILE NHÀ MÁY
+    // Iconic Red Beret, Knitted Red Sweater, Dark Skirt & Storyboard Sketchbook
+    // =========================================================================
+    const redSweaterMat = new THREE.MeshPhysicalMaterial({ color: 0xdc2626, roughness: 0.45, sheen: 0.5 });
+    const skirtMat = new THREE.MeshPhysicalMaterial({ color: 0x0f766e, roughness: 0.5 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x18181b, roughness: 0.35 });
+
+    leftLeg.position.set(-0.11, 0.6, 0);
+    rightLeg.position.set(0.11, 0.6, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const shoe = createSculptedShoe(redSweaterMat, pureWhiteMat, goldMat, 'mary_jane');
+      shoe.position.set(0, -0.56, 0);
+      legGrp.add(shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 0.28, 20), skirtMat);
+    skirt.position.set(0, 0.64, 0);
+    bodyGroup.add(skirt);
+
+    const torsoPts = [
+      new THREE.Vector2(0.16, -0.22),
+      new THREE.Vector2(0.18, 0.06),
+      new THREE.Vector2(0.17, 0.24),
+      new THREE.Vector2(0.1, 0.3)
+    ];
+    const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoPts, 24), redSweaterMat);
+    torso.position.set(0, 0.94, 0);
+    bodyGroup.add(torso);
+
+    leftArm.position.set(-0.26, 1.15, 0);
+    rightArm.position.set(0.26, 1.15, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.058, 0.36, 14), redSweaterMat);
+      sleeve.position.y = -0.18;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.42, 0);
+      armGrp.add(sleeve, hand);
+    });
+
+    const sketchbook = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.16), pureWhiteMat);
+    sketchbook.position.set(0.04, -0.4, 0.08);
+    rightArm.add(sketchbook);
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.48, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.23);
+    headGroup.add(head);
+
+    [-0.075, 0.075].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.95, true);
+      eye.position.set(xEye, 0.02, 0.2);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const bob = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), darkHairMat);
+    bob.scale.set(1.04, 0.9, 0.92);
+    bob.position.set(0, 0.02, -0.02);
+    headGroup.add(bob);
+
+    const beret = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.06, 20), redSweaterMat);
+    beret.rotation.z = 0.2;
+    beret.position.set(0.04, 0.22, 0);
+    const beretStalk = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.03, 6), redSweaterMat);
+    beretStalk.position.set(0.04, 0.26, 0);
+    headGroup.add(beret, beretStalk);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'tamako') {
+    // =========================================================================
+    // 11. BÀ NOBI (TAMAKO NOBI - MẸ NOBITA) — KẾ TOÁN VIÊN KIỂM SOÁT CHI PHÍ
+    // Round Glasses, Lavender Blouse, Apron & Cost Ledger
+    // =========================================================================
+    const blouseMat = new THREE.MeshPhysicalMaterial({ color: 0xf472b6, roughness: 0.4 });
+    const apronMat = new THREE.MeshPhysicalMaterial({ color: 0x10b981, roughness: 0.5 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x18181b, roughness: 0.35 });
+
+    leftLeg.position.set(-0.1, 0.6, 0);
+    rightLeg.position.set(0.1, 0.6, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, goldMat, 'mary_jane');
+      shoe.position.set(0, -0.58, 0);
+      legGrp.add(shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.24, 0.3, 20), apronMat);
+    apron.position.set(0, 0.62, 0);
+    bodyGroup.add(apron);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.32, 20), blouseMat);
+    torso.position.set(0, 0.95, 0);
+    bodyGroup.add(torso);
+
+    leftArm.position.set(-0.24, 1.2, 0);
+    rightArm.position.set(0.24, 1.2, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.4, 14), blouseMat);
+      sleeve.position.y = -0.2;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.45, 0);
+      armGrp.add(sleeve, hand);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.54, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.22);
+    headGroup.add(head);
+
+    [-0.07, 0.07].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.9, false);
+      eye.position.set(xEye, 0.02, 0.195);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.006, 8, 20), darkMetalMat);
+      ring.position.set(xEye, 0.02, 0.215);
+      headGroup.add(ring);
+    });
+
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 12), darkHairMat);
+    bun.position.set(0, -0.05, -0.22);
+    headGroup.add(bun);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'nobisuke') {
+    // =========================================================================
+    // 12. ÔNG NOBI (NOBISUKE NOBI - BỐ NOBITA) — CHUYÊN VIÊN KINH DOANH ĐỐI NGOẠI
+    // Classic Salaryman Navy Suit, Red Striped Tie & Business Briefcase
+    // =========================================================================
+    bodyGroup.scale.set(1.06, 1.0, 1.04);
+    const navySuitMat = new THREE.MeshPhysicalMaterial({ color: 0x1e3a8a, roughness: 0.4 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x18181b, roughness: 0.35 });
+
+    leftLeg.position.set(-0.12, 0.64, 0);
+    rightLeg.position.set(0.12, 0.64, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.075, 0.48, 16), navySuitMat);
+      cyl.position.y = -0.24;
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, goldMat, 'oxford');
+      shoe.position.set(0, -0.62, 0);
+      legGrp.add(cyl, shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.21, 0.38, 20), navySuitMat);
+    torso.position.set(0, 0.98, 0);
+    bodyGroup.add(torso);
+
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.015), redAccentMat);
+    tie.position.set(0, 1.15, 0.18);
+    bodyGroup.add(tie);
+
+    leftArm.position.set(-0.28, 1.25, 0);
+    rightArm.position.set(0.28, 1.25, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.42, 14), navySuitMat);
+      sleeve.position.y = -0.21;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.47, 0);
+      armGrp.add(sleeve, hand);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.56, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.23);
+    headGroup.add(head);
+
+    [-0.075, 0.075].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.9, false);
+      eye.position.set(xEye, 0.02, 0.2);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.235, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.45),
+      darkHairMat
+    );
+    hairCap.rotation.x = -0.35;
+    hairCap.position.set(0, 0.04, -0.02);
+    headGroup.add(hairCap);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'sewashi') {
+    // =========================================================================
+    // 13. SEWASHI (NÔ-BI-TÔ) — KỸ SƯ CÔNG NGHỆ 22ND CENTURY & TỰ ĐỘNG HÓA
+    // Cyber Neon Visor, High-Tech Orange/White Zip Hoodie
+    // =========================================================================
+    const cyberOrangeMat = new THREE.MeshPhysicalMaterial({ color: 0xf97316, roughness: 0.35 });
+    const cyanVisorMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+
+    leftLeg.position.set(-0.1, 0.62, 0);
+    rightLeg.position.set(0.1, 0.62, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const shoe = createSculptedShoe(darkMetalMat, cyanVisorMat, cyberOrangeMat, 'sneaker');
+      shoe.position.set(0, -0.6, 0);
+      legGrp.add(shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.17, 0.36, 20), cyberOrangeMat);
+    torso.position.set(0, 0.96, 0);
+    bodyGroup.add(torso);
+
+    leftArm.position.set(-0.25, 1.2, 0);
+    rightArm.position.set(0.25, 1.2, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.4, 14), pureWhiteMat);
+      sleeve.position.y = -0.2;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.45, 0);
+      armGrp.add(sleeve, hand);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.54, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.22);
+    headGroup.add(head);
+
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.06), cyanVisorMat);
+    visor.position.set(0, 0.025, 0.2);
+    headGroup.add(visor);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'sunetsugu') {
+    // =========================================================================
+    // 14. SUNETSUGU — CHUYÊN VIÊN PHÁP CHẾ HỢP ĐỒNG & CÔNG NỢ
+    // Angular Suneo-Style Bangs, Prep Navy Blazer & Yellow Bowtie
+    // =========================================================================
+    const blazerMat = new THREE.MeshPhysicalMaterial({ color: 0x1e3a8a, roughness: 0.4 });
+    const bowtieMat = new THREE.MeshPhysicalMaterial({ color: 0xfacc15, roughness: 0.3 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x0f172a, roughness: 0.3 });
+
+    leftLeg.position.set(-0.1, 0.62, 0);
+    rightLeg.position.set(0.1, 0.62, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, goldMat, 'oxford');
+      shoe.position.set(0, -0.6, 0);
+      legGrp.add(shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.16, 0.34, 20), blazerMat);
+    torso.position.set(0, 0.96, 0);
+    bodyGroup.add(torso);
+
+    const bowtie = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.02), bowtieMat);
+    bowtie.position.set(0, 1.18, 0.16);
+    bodyGroup.add(bowtie);
+
+    leftArm.position.set(-0.25, 1.2, 0);
+    rightArm.position.set(0.25, 1.2, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.4, 14), blazerMat);
+      sleeve.position.y = -0.2;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.45, 0);
+      armGrp.add(sleeve, hand);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.54, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.22);
+    headGroup.add(head);
+
+    [-0.065, 0.065].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x0f172a, 0.9, false);
+      eye.position.set(xEye, 0.025, 0.19);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const spike = createHairStrand(
+      [new THREE.Vector3(0, 0.22, 0.05), new THREE.Vector3(0.08, 0.18, 0.2), new THREE.Vector3(0.14, 0.12, 0.24)],
+      0.03,
+      darkHairMat
+    );
+    headGroup.add(spike);
+    bodyGroup.add(headGroup);
+  } else if (agent.characterKey === 'goda_mom') {
+    // =========================================================================
+    // 15. MẸ CHAIAN (BÀ CHỦ TIỆM TẠP HÓA GODA) — GIÁM SÁT HẬU CẦN 5S & BHLĐ
+    // Robust Commanding Presence, Turquoise Shopkeeper Apron & Topknot Bun
+    // =========================================================================
+    bodyGroup.scale.set(1.16, 1.1, 1.14);
+    const apronMat = new THREE.MeshPhysicalMaterial({ color: 0x0d9488, roughness: 0.5 });
+    const darkHairMat = new THREE.MeshPhysicalMaterial({ color: 0x18181b, roughness: 0.4 });
+
+    leftLeg.position.set(-0.13, 0.62, 0);
+    rightLeg.position.set(0.13, 0.62, 0);
+    [leftLeg, rightLeg].forEach((legGrp) => {
+      const shoe = createSculptedShoe(darkMetalMat, pureWhiteMat, darkHairMat, 'boot');
+      shoe.position.set(0, -0.6, 0);
+      legGrp.add(shoe);
+    });
+    bodyGroup.add(leftLeg, rightLeg);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.38, 20), apronMat);
+    torso.position.set(0, 0.98, 0);
+    bodyGroup.add(torso);
+
+    leftArm.position.set(-0.31, 1.25, 0);
+    rightArm.position.set(0.31, 1.25, 0);
+    [leftArm, rightArm].forEach((armGrp, idx) => {
+      const isRight = idx === 1;
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 14), apronMat);
+      sleeve.position.y = -0.19;
+      const hand = createSculptedHand(skinMat, isRight);
+      hand.position.set(0, -0.44, 0);
+      armGrp.add(sleeve, hand);
+    });
+    bodyGroup.add(leftArm, rightArm);
+
+    headGroup.position.set(0, 1.58, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.24);
+    headGroup.add(head);
+
+    [-0.08, 0.08].forEach((xEye) => {
+      const eye = createSculptedAnimeEye(0x18181b, 0.95, false);
+      eye.position.set(xEye, 0.02, 0.21);
+      eyeGroups.push(eye);
+      headGroup.add(eye);
+    });
+
+    const topknot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 12), darkHairMat);
+    topknot.position.set(0, 0.3, -0.04);
+    headGroup.add(topknot);
+    bodyGroup.add(headGroup);
+  } else {
+    bodyGroup.scale.setScalar(1.0);
+    leftLeg.position.set(-0.12, 0.6, 0);
+    rightLeg.position.set(0.12, 0.6, 0);
+    bodyGroup.add(leftLeg, rightLeg);
+    headGroup.position.set(0, 1.5, 0);
+    const head = createContouredAnimeHead(skinMat, blushMat, smileMouthMat, 0.22);
+    headGroup.add(head);
+    bodyGroup.add(headGroup);
   }
 
   return {
@@ -1757,6 +2573,7 @@ export function buildDetailedAgencyStaffCharacter(
     isFemale: boolean;
     mode: 'seated_work' | 'seated_cafe' | 'seated_game' | 'walker';
     staffIndex?: number;
+    characterKey?: DoraemonCharacterKey;
   },
   bodyGroup: THREE.Group
 ): {
@@ -1768,6 +2585,46 @@ export function buildDetailedAgencyStaffCharacter(
 } {
   const isSeated = config.mode !== 'walker';
   const idx = config.staffIndex ?? 0;
+
+  if (config.characterKey) {
+    const fakeAgent: any = {
+      id: config.id,
+      characterKey: config.characterKey,
+      name: config.id,
+      roleTitle: '',
+      departmentId: 'sales_quoting',
+      departmentLabel: '',
+      zoneId: 'lobby',
+      accentHex: '#f59e0b',
+      suitColorHex: config.suitColor,
+      hairColorHex: config.hairColor,
+      accessoryType: 'clipboard',
+      primaryMission: '',
+      strictBoundary: '',
+      personalityTraits: [],
+      spatialBehavior: '',
+      allowedKeywords: [],
+      homePosition: { x: 0, y: 0, z: 0 },
+      workstationLookAt: { x: 0, y: 0, z: 1 },
+      collaborationPoint: { x: 0, y: 0, z: 0 },
+      sampleTasks: []
+    };
+    const parts = buildDetailedDoraemonCharacter(fakeAgent, bodyGroup);
+    if (isSeated) {
+      parts.leftLeg.rotation.x = -Math.PI / 2;
+      parts.rightLeg.rotation.x = -Math.PI / 2;
+      parts.leftLeg.position.z = 0.12;
+      parts.rightLeg.position.z = 0.12;
+      bodyGroup.position.y = -0.16;
+    }
+    return {
+      leftLeg: parts.leftLeg as THREE.Group,
+      rightLeg: parts.rightLeg as THREE.Group,
+      leftArm: parts.leftArm as THREE.Group,
+      rightArm: parts.rightArm as THREE.Group,
+      head: parts.headGroup
+    };
+  }
 
   const skinMat = new THREE.MeshPhysicalMaterial({
     color: 0xffdfc4,
