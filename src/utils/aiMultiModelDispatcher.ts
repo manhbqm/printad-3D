@@ -52,10 +52,7 @@ export function getProviderDisplayName(provider: AiModelProvider): string {
   return 'Local SOP Engine (0đ)';
 }
 
-export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
-  const tier = getAgentTier(agent);
-  if (agent.aiModelConfig) return agent.aiModelConfig;
-
+export function getModelConfigByTier(tier: AiRoleTier): AgentModelConfig {
   if (tier === 'ceo') {
     const provider = (process.env.CEO_MODEL_PROVIDER || 'openai') as AiModelProvider;
     const modelName = process.env.CEO_MODEL || (provider === 'gemini' ? 'gemini-2.5-pro' : 'gpt-4o');
@@ -110,6 +107,12 @@ export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
     badgeColor: '#38bdf8',
     description: 'Thực thi tác vụ nhanh, bóc tách định mức bài in, kiểm kho thời gian thực'
   };
+}
+
+export function getAgentModelConfig(agent: AgentProfile): AgentModelConfig {
+  if (agent.aiModelConfig) return agent.aiModelConfig;
+  const tier = getAgentTier(agent);
+  return getModelConfigByTier(tier);
 }
 
 export function getSystemInstruction(targetAgent: AgentProfile, deptSopsText: string): string {

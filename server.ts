@@ -10,6 +10,7 @@ import {
 import {
   executeMultiModelTask,
   getAgentModelConfig,
+  getModelConfigByTier,
   getAgentTier
 } from './src/utils/aiMultiModelDispatcher';
 import { AgentProfile, SopDocument, TaskReport } from './src/types/office';
@@ -29,13 +30,9 @@ async function startServer() {
       !k.startsWith('MY_') &&
       k.trim().length > 6;
 
-    const doraemon = INITIAL_AGENTS.find(a => a.characterKey === 'doraemon') || INITIAL_AGENTS[0];
-    const dekisugi = INITIAL_AGENTS.find(a => a.characterKey === 'dekisugi') || INITIAL_AGENTS[1];
-    const jaiko = INITIAL_AGENTS.find(a => a.characterKey === 'jaiko') || INITIAL_AGENTS[8];
-
-    const ceoConfig = getAgentModelConfig(doraemon);
-    const managerConfig = getAgentModelConfig(dekisugi);
-    const execConfig = getAgentModelConfig(jaiko);
+    const ceoConfig = getModelConfigByTier('ceo');
+    const managerConfig = getModelConfigByTier('manager');
+    const execConfig = getModelConfigByTier('executive');
 
     res.json({
       tiers: {
