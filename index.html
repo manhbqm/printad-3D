@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var currentFetch =
+            typeof window.fetch === 'function'
+              ? window.fetch.bind(window)
+              : undefined;
+          var descriptor = {
+            configurable: true,
+            enumerable: true,
+            get: function () {
+              return currentFetch;
+            },
+            set: function (nextFetch) {
+              if (typeof nextFetch === 'function') {
+                currentFetch = nextFetch;
+              }
+            }
+          };
+          if (typeof Window !== 'undefined' && Window.prototype) {
+            var protoDesc = Object.getOwnPropertyDescriptor(
+              Window.prototype,
+              'fetch'
+            );
+            if (!protoDesc || protoDesc.configurable !== false) {
+              Object.defineProperty(Window.prototype, 'fetch', descriptor);
+            }
+          }
+          var winDesc = Object.getOwnPropertyDescriptor(window, 'fetch');
+          if (!winDesc || winDesc.configurable !== false) {
+            Object.defineProperty(window, 'fetch', descriptor);
+          }
+        } catch (_err) {}
+
+        window.addEventListener(
+          'error',
+          function (event) {
+            if (
+              event &&
+              ((event.filename &&
+                event.filename.indexOf('chrome-extension://') === 0) ||
+                (event.message &&
+                  event.message.indexOf(
+                    'Cannot set property fetch of #<Window>'
+                  ) !== -1))
+            ) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+            }
+          },
+          true
+        );
+      })();
+    </script>
+    <title>PrintAd 3D Virtual Office</title>
+    <meta name="description" content="Không gian văn phòng ảo 3D cho công ty in ấn quảng cáo với 5 trợ lý AI chuyên biệt theo từng bộ phận, huấn luyện theo tài liệu quy chuẩn SOP và mô phỏng thực thi nhiệm vụ trực quan." />
+    <meta property="og:title" content="PrintAd 3D Virtual Office" />
+    <meta property="og:description" content="Không gian văn phòng ảo 3D cho công ty in ấn quảng cáo với 5 trợ lý AI chuyên biệt theo từng bộ phận, huấn luyện theo tài liệu quy chuẩn SOP và mô phỏng thực thi nhiệm vụ trực quan." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap&subset=vietnamese" rel="stylesheet" />
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-amber-500/30 selection:text-amber-200 overflow-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

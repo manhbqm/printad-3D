@@ -1,0 +1,1179 @@
+import React, { useState } from 'react';
+import {
+  Building2,
+  Calculator,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  FileSpreadsheet,
+  FileText,
+  FolderPlus,
+  Layers,
+  Play,
+  Send,
+  ShieldAlert,
+  Users,
+  Video
+} from 'lucide-react';
+import {
+  AgentProfile,
+  DepartmentId,
+  OfficeZone,
+  PrintQuoteInput,
+  SopDocument,
+  TaskAssignment,
+  ZoneId
+} from '../types/office';
+import {
+  calculatePrintQuote,
+  formatVnd,
+  validateSopDocumentInput
+} from '../utils/officeLogic';
+
+export type DockTab = 'zones' | 'agents' | 'tasks' | 'sops';
+
+interface BottomControlDockProps {
+  activeTab: DockTab;
+  setActiveTab: (tab: DockTab) => void;
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean) => void;
+  zones: OfficeZone[];
+  activeZoneId: ZoneId;
+  onSelectZone: (zoneId: ZoneId) => void;
+  agents: AgentProfile[];
+  selectedAgentId: string;
+  onSelectAgent: (agentId: string) => void;
+  tasks: TaskAssignment[];
+  selectedTaskId: string;
+  onSelectTask: (taskId: string) => void;
+  onAssignTask: (
+    agentId: string,
+    prompt: string,
+    targetZoneId: ZoneId,
+    priority: 'normal' | 'high' | 'urgent'
+  ) => void;
+  onIssueCeoDirective: (
+    prompt: string,
+    priority: 'normal' | 'high' | 'urgent'
+  ) => void;
+  sops: SopDocument[];
+  onAddSop: (newSop: SopDocument) => void;
+  onToggleSop: (sopId: string) => void;
+  isAllHandsMeeting: boolean;
+  onToggleAllHandsMeeting: () => void;
+}
+
+const CEO_DIRECTIVE_PRESETS: {
+  id: string;
+  label: string;
+  prompt: string;
+  expectedDeptHint: string;
+}[] = [
+  {
+    id: 'ceo-quote',
+    label: 'Báo giá 80m2 bạt Hiflex, làm Hợp đồng & Phiếu giao hàng',
+    prompt:
+      'Khách hàng chuỗi cửa hàng đặt in 80m2 bạt Hiflex ngoài trời và 12 bộ Standee cuốn nhôm. Hãy tính báo giá chi tiết, soạn Hợp đồng mua bán, Phiếu mua bán và Phiếu giao hàng cho khách.',
+    expectedDeptHint: '→ Shizuka (CSKH & Báo giá)'
+  },
+  {
+    id: 'ceo-design',
+    label: 'Chỉnh sửa file thiết kế Poster & Catalog chuẩn in CMYK',
+    prompt:
+      'Khách vừa gửi bộ file thiết kế Poster quảng cáo và Catalog 16 trang. Kiểm tra và chỉnh sửa ngay hệ màu CMYK, tràn lề bleed 3mm, convert font chữ và in thử bản proof tại khu chung.',
+    expectedDeptHint: '→ Nobita (Thiết kế)'
+  },
+  {
+    id: 'ceo-acc',
+    label: 'Đối soát công nợ, hợp đồng đối tác & giấy tờ hóa đơn VAT',
+    prompt:
+      'Kiểm tra toàn bộ công nợ tháng 10, thông tin hợp đồng đối tác & khách hàng B2B, đối soát chi phí vật tư và chuẩn bị giấy tờ hóa đơn VAT cho các đơn đã giao.',
+    expectedDeptHint: '→ Suneo (Kế toán)'
+  },
+  {
+    id: 'ceo-mkt',
+    label: 'Tìm hiểu đối thủ cạnh tranh & chiến dịch Marketing POSM',
+    prompt:
+      'Tìm hiểu về đối thủ cạnh tranh trực tiếp trong mảng in nhanh và thi công biển hiệu tại khu vực, so sánh khung giá m2 và đề xuất chiến dịch Marketing gói Combo POSM Khai Trương.',
+    expectedDeptHint: '→ Chaian (Marketing)'
+  },
+  {
+    id: 'ceo-hr',
+    label: 'Tư vấn tổng hợp vận hành chung & điều phối xưởng in',
+    prompt:
+      'Doraemon hãy tư vấn tổng hợp chung cho Giám đốc về tình hình phối hợp giữa các bộ phận (Shizuka, Suneo, Nobita, Chaian) và phương án điều phối nhân sự xưởng in tuần cao điểm.',
+    expectedDeptHint: '→ Doraemon (Quản lý chung)'
+  }
+];
+
+export const BottomControlDock: React.FC<BottomControlDockProps> = ({
+  activeTab,
+  setActiveTab,
+  isCollapsed,
+  setIsCollapsed,
+  zones,
+  activeZoneId,
+  onSelectZone,
+  agents,
+  selectedAgentId,
+  onSelectAgent,
+  tasks,
+  selectedTaskId,
+  onSelectTask,
+  onAssignTask,
+  onIssueCeoDirective,
+  sops,
+  onAddSop,
+  onToggleSop,
+  isAllHandsMeeting,
+  onToggleAllHandsMeeting
+}) => {
+  const selectedAgent =
+    agents.find((a) => a.id === selectedAgentId) || agents[0];
+  const activeZone =
+    zones.find((z) => z.id === activeZoneId) || zones[0];
+  const selectedTask =
+    tasks.find((t) => t.id === selectedTaskId) || tasks[0];
+
+  // Dispatch mode: 'ceo_auto' (Director issues general directive -> Lan Hương dispatches) vs 'direct'
+  const [dispatchMode, setDispatchMode] = useState<'ceo_auto' | 'direct'>('ceo_auto');
+  const [taskPrompt, setTaskPrompt] = useState<string>('');
+  const [taskPriority, setTaskPriority] = useState<'normal' | 'high' | 'urgent'>('high');
+  const [taskZoneId, setTaskZoneId] = useState<ZoneId>('coworking');
+  const [taskFormError, setTaskFormError] = useState<string>('');
+
+  // Quick print quote calculator state (for Sales/Quoting department)
+  const [showCalculator, setShowCalculator] = useState<boolean>(false);
+  const [quoteInput, setQuoteInput] = useState<PrintQuoteInput>({
+    materialType: 'hiflex',
+    widthMeters: 6,
+    heightMeters: 10,
+    quantity: 1,
+    finishingOption: 'eyelet_glue',
+    rushOrder: false
+  });
+
+  // SOP Training Document form state
+  const [sopDeptId, setSopDeptId] = useState<DepartmentId>(selectedAgent.departmentId);
+  const [sopCode, setSopCode] = useState<string>('SOP-IN-2026-05');
+  const [sopTitle, setSopTitle] = useState<string>('');
+  const [sopCategory, setSopCategory] = useState<string>('Quy chuẩn Chuyên môn');
+  const [sopRulesText, setSopRulesText] = useState<string>('');
+  const [sopError, setSopError] = useState<string>('');
+  const [sopSuccess, setSopSuccess] = useState<string>('');
+
+  const quoteResult = calculatePrintQuote(quoteInput);
+
+  const handleTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskPrompt.trim()) {
+      setTaskFormError('Vui lòng nhập nội dung chỉ thị hoặc nhiệm vụ cần giao.');
+      return;
+    }
+    setTaskFormError('');
+    if (dispatchMode === 'ceo_auto') {
+      onIssueCeoDirective(taskPrompt.trim(), taskPriority);
+    } else {
+      onAssignTask(selectedAgent.id, taskPrompt.trim(), taskZoneId, taskPriority);
+    }
+    setTaskPrompt('');
+  };
+
+  const handleSopSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSopSuccess('');
+    const validation = validateSopDocumentInput({
+      departmentId: sopDeptId,
+      code: sopCode,
+      title: sopTitle,
+      category: sopCategory,
+      summary: sopTitle,
+      rulesText: sopRulesText
+    });
+
+    if (!validation.valid) {
+      setSopError(validation.error || 'Dữ liệu SOP không hợp lệ.');
+      return;
+    }
+
+    setSopError('');
+    const created: SopDocument = {
+      id: `sop-custom-${Date.now()}`,
+      departmentId: sopDeptId,
+      code: sopCode.trim().toUpperCase(),
+      title: sopTitle.trim(),
+      category: sopCategory.trim() || 'Quy chuẩn Nội bộ',
+      summary: `Tài liệu huấn luyện bổ sung cho bộ phận (${validation.parsedRules.length} quy tắc).`,
+      rules: validation.parsedRules,
+      updatedAt: '2026-10-20',
+      isActive: true
+    };
+
+    onAddSop(created);
+    setSopTitle('');
+    setSopRulesText('');
+    setSopCode(`SOP-IN-2026-0${sops.length + 2}`);
+    setSopSuccess(`Đã nạp tài liệu "${created.code}" vào bộ nhớ huấn luyện bộ phận!`);
+  };
+
+  const handleFileUploadSop = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = String(reader.result || '').trim();
+      if (content) {
+        setSopTitle(file.name.replace(/\.[^/.]+$/, ''));
+        setSopRulesText(content);
+        setSopError('');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const deptSops = sops.filter((s) => s.departmentId === sopDeptId);
+
+  return (
+    <section
+      aria-label="Bảng điều khiển trung tâm Văn phòng ảo 3D"
+      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-20 w-[96vw] max-w-[1160px] pointer-events-auto"
+    >
+      {/* Collapse / Expand Handle Bar */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3.5 py-1.5 bg-slate-900 border border-b-0 border-slate-700 rounded-t-xl">
+        <div className="flex items-center gap-2 text-xs text-slate-300 truncate min-w-0">
+          <span className="font-semibold text-amber-400 truncate">
+            Khu vực: {activeZone.shortLabel}
+          </span>
+          <span aria-hidden="true" className="hidden md:inline">·</span>
+          <span className="hidden md:inline truncate">
+            Trợ lý: <strong className="text-white">{selectedAgent.name}</strong> ({selectedAgent.departmentLabel})
+          </span>
+          <span aria-hidden="true" className="hidden lg:inline">·</span>
+          <span className="hidden lg:inline text-slate-400 tabular-nums">
+            {sops.filter((s) => s.isActive).length} tài liệu SOP đang kích hoạt
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          <button
+            type="button"
+            onClick={onToggleAllHandsMeeting}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isAllHandsMeeting
+                ? 'bg-emerald-500 text-slate-950 font-semibold'
+                : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            {isAllHandsMeeting ? 'Giải tán Họp' : 'Họp Phòng Họp'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-expanded={!isCollapsed}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {isCollapsed ? (
+              <>
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>Mở HUD</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>Thu gọn HUD</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Dock Container */}
+      {!isCollapsed && (
+        <div className="bg-slate-950/95 border border-slate-700 rounded-b-xl shadow-2xl overflow-hidden">
+          {/* Segmented Navigation Tabs */}
+          <div
+            role="tablist"
+            aria-label="Chức năng văn phòng ảo"
+            className="flex items-center justify-between gap-2 px-4 py-2 bg-slate-900/90 border-b border-slate-800 overflow-x-auto"
+          >
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'zones'}
+                onClick={() => setActiveTab('zones')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'zones'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Không gian 3D & Khu vực (9)</span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'agents'}
+                onClick={() => setActiveTab('agents')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'agents'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Hồ sơ 5 Trợ lý AI</span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'tasks'}
+                onClick={() => setActiveTab('tasks')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'tasks'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Play className="w-3.5 h-3.5" />
+                <span>Giao nhiệm vụ & Báo cáo ({tasks.length})</span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'sops'}
+                onClick={() => setActiveTab('sops')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'sops'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Huấn luyện Quy chuẩn SOP ({sops.length})</span>
+              </button>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-2 text-xs text-slate-400 whitespace-nowrap shrink-0">
+              <Video className="w-3.5 h-3.5 text-amber-400" />
+              <span>Kéo chuột để xoay 3D · Cuộn để thu phóng · Phím WASD di chuyển</span>
+            </div>
+          </div>
+
+          {/* TAB 1: 3D ZONES & SPATIAL INTERACTION */}
+          {activeTab === 'zones' && (
+            <div className="p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 max-h-[235px] overflow-y-auto">
+              {/* Zone Selector Buttons */}
+              <div className="lg:col-span-5 flex flex-col gap-2">
+                <div className="text-xs font-semibold text-slate-400">
+                  Chọn Khu vực Chức năng & Phòng ban (Di chuyển Camera 3D)
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {zones.map((z) => {
+                    const isSelected = z.id === activeZoneId;
+                    return (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectZone(z.id);
+                          if (z.departmentId) {
+                            const deptAgent = agents.find(
+                              (a) => a.departmentId === z.departmentId
+                            );
+                            if (deptAgent) onSelectAgent(deptAgent.id);
+                          }
+                        }}
+                        className={`px-2.5 py-2 text-xs font-medium rounded-lg border text-left truncate transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-800 text-white border-amber-400 font-semibold'
+                            : 'bg-slate-900/70 text-slate-300 border-slate-800 hover:bg-slate-800/80 hover:text-white'
+                        }`}
+                      >
+                        {z.shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Zone Description & AI Spatial Interaction */}
+              <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-lg p-3.5 flex flex-col justify-between gap-2">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-bold text-white font-display">
+                      {activeZone.name}
+                    </h2>
+                    <span className="text-xs text-slate-400 tabular-nums">
+                      Toạ độ 3D: ({activeZone.center.x}, {activeZone.center.z}) · {activeZone.size.width}m × {activeZone.size.depth}m
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    {activeZone.description}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800 text-xs">
+                  <div>
+                    <div className="font-semibold text-slate-200 mb-1">
+                      Trang thiết bị 3D trong khu vực:
+                    </div>
+                    <ul className="space-y-0.5 text-slate-400">
+                      {activeZone.keyEquipment.slice(0, 3).map((eq, i) => (
+                        <li key={i} className="truncate">
+                          - {eq}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-amber-300 mb-1">
+                      Cách Trợ lý AI tương tác không gian này:
+                    </div>
+                    <p className="text-slate-300 leading-relaxed">
+                      {activeZone.aiSpatialInteraction}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: 5 AI ASSISTANT PROFILES */}
+          {activeTab === 'agents' && (
+            <div className="p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 max-h-[245px] overflow-y-auto">
+              {/* Left list of 5 AI Assistants */}
+              <div className="lg:col-span-4 flex flex-col gap-1.5">
+                {agents.map((ag) => {
+                  const isSel = ag.id === selectedAgent.id;
+                  return (
+                    <button
+                      key={ag.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectAgent(ag.id);
+                        onSelectZone(ag.zoneId);
+                      }}
+                      className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
+                        isSel
+                          ? 'bg-slate-800 border-amber-400 text-white'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/70'
+                      }`}
+                    >
+                      <div className="truncate pr-2">
+                        <div className="text-xs font-bold text-white truncate">
+                          {ag.name} · {ag.departmentLabel}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {ag.roleTitle}
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono text-amber-400 shrink-0">
+                        Chọn
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Right Detailed Profile of Selected Assistant */}
+              <div className="lg:col-span-8 bg-slate-900/80 border border-slate-800 rounded-lg p-3.5 flex flex-col justify-between gap-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-800 pb-2">
+                  <div>
+                    <h3 className="text-base font-bold text-white font-display">
+                      {selectedAgent.name} — {selectedAgent.roleTitle}
+                    </h3>
+                    <div className="text-xs text-slate-400">
+                      Bộ phận: <strong className="text-slate-200">{selectedAgent.departmentLabel}</strong> · Vị trí 3D: ({selectedAgent.homePosition.x}, {selectedAgent.homePosition.z})
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSopDeptId(selectedAgent.departmentId);
+                        setActiveTab('sops');
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Xem tài liệu SOP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('tasks')}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Giao việc cho {selectedAgent.name}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1.5">
+                    <div>
+                      <span className="font-semibold text-slate-200">Nhiệm vụ chính: </span>
+                      <span className="text-slate-300">{selectedAgent.primaryMission}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-amber-300">Giới hạn chuyên môn nghiêm ngặt: </span>
+                      <span className="text-slate-300">{selectedAgent.strictBoundary}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-slate-200">
+                      Đặc điểm tính cách nổi bật & Tương tác 3D:
+                    </div>
+                    <ul className="space-y-1 text-slate-300">
+                      {selectedAgent.personalityTraits.map((trait, idx) => (
+                        <li key={idx}>• {trait}</li>
+                      ))}
+                    </ul>
+                    <div className="text-slate-400 pt-0.5">
+                      {selectedAgent.spatialBehavior}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CEO DIRECTIVE (DORAEMON AUTO-DISPATCH), SIMULATION & EXECUTIVE REPORT */}
+          {activeTab === 'tasks' && (
+            <div className="p-3.5 grid grid-cols-1 md:grid-cols-12 gap-3.5 max-h-[270px] overflow-y-auto">
+              {/* Left Column: CEO Directive via Doraemon (Default) or Direct Task */}
+              <div className="md:col-span-5 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 p-0.5 bg-slate-900 border border-slate-800 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setDispatchMode('ceo_auto')}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        dispatchMode === 'ceo_auto'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Chỉ thị Giám đốc (Doraemon điều phối)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDispatchMode('direct')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        dispatchMode === 'direct'
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Giao trực tiếp
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCalculator(!showCalculator)}
+                    className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-medium whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <Calculator className="w-3.5 h-3.5" />
+                    <span>{showCalculator ? 'Đóng tính giá' : 'Tính giá m2'}</span>
+                  </button>
+                </div>
+
+                {dispatchMode === 'ceo_auto' ? (
+                  <div className="px-2.5 py-1.5 bg-slate-900/90 border border-slate-800 rounded-lg text-[11px] text-slate-300 leading-relaxed">
+                    <strong className="text-sky-400">Trưởng phòng Quản lý chung Doraemon:</strong> Nhận chỉ thị chung từ Giám đốc → Tự động giao đúng thành viên (<strong className="text-white">Shizuka, Suneo, Nobita, Chaian</strong>) → Nhận báo cáo từ nhân viên và tổng hợp tư vấn lại cho Giám đốc.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      id="agent-select-task"
+                      aria-label="Chọn Trợ lý AI nhận nhiệm vụ"
+                      value={selectedAgent.id}
+                      onChange={(e) => onSelectAgent(e.target.value)}
+                      className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white"
+                    >
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} — {a.departmentLabel}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      aria-label="Khu vực thực thi 3D"
+                      value={taskZoneId}
+                      onChange={(e) => setTaskZoneId(e.target.value as ZoneId)}
+                      className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white"
+                    >
+                      <option value="coworking">Thực thi tại: Khu chung / Máy in</option>
+                      <option value="meeting">Thực thi tại: Phòng họp</option>
+                      <option value="lobby">Thực thi tại: Sảnh chính</option>
+                      <option value={selectedAgent.zoneId}>
+                        Tại bàn bộ phận ({selectedAgent.departmentLabel})
+                      </option>
+                    </select>
+                  </div>
+                )}
+
+                {showCalculator ? (
+                  <div className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg space-y-2 text-xs">
+                    <div className="font-semibold text-amber-400">
+                      Công cụ Bóc tách Báo giá Nhanh (SOP-BG-2026-01)
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-slate-400">Chất liệu</label>
+                        <select
+                          aria-label="Chất liệu in"
+                          value={quoteInput.materialType}
+                          onChange={(e) =>
+                            setQuoteInput({
+                              ...quoteInput,
+                              materialType: e.target.value as PrintQuoteInput['materialType']
+                            })
+                          }
+                          className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-white"
+                        >
+                          <option value="hiflex">Bạt Hiflex (45k/m2)</option>
+                          <option value="decal_pp">Decal PP (75k/m2)</option>
+                          <option value="mica_led">Mica LED (1.15tr/m2)</option>
+                          <option value="standee">Standee (260k/bộ)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400">Ngang × Cao (m)</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            aria-label="Chiều ngang mét"
+                            min={0.5}
+                            step={0.5}
+                            value={quoteInput.widthMeters}
+                            onChange={(e) =>
+                              setQuoteInput({
+                                ...quoteInput,
+                                widthMeters: Number(e.target.value)
+                              })
+                            }
+                            className="w-full px-1.5 py-1 bg-slate-950 border border-slate-700 rounded text-white tabular-nums"
+                          />
+                          <input
+                            type="number"
+                            aria-label="Chiều cao mét"
+                            min={0.5}
+                            step={0.5}
+                            value={quoteInput.heightMeters}
+                            onChange={(e) =>
+                              setQuoteInput({
+                                ...quoteInput,
+                                heightMeters: Number(e.target.value)
+                              })
+                            }
+                            className="w-full px-1.5 py-1 bg-slate-950 border border-slate-700 rounded text-white tabular-nums"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400">Số lượng</label>
+                        <input
+                          type="number"
+                          aria-label="Số lượng in"
+                          min={1}
+                          value={quoteInput.quantity}
+                          onChange={(e) =>
+                            setQuoteInput({
+                              ...quoteInput,
+                              quantity: Number(e.target.value)
+                            })
+                          }
+                          className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-white tabular-nums"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                      <span className="text-slate-300 tabular-nums">
+                        Tổng ({quoteResult.totalAreaSqm}m2, CK {quoteResult.discountPercent}%, VAT 8%):{' '}
+                        <strong className="text-emerald-400">{formatVnd(quoteResult.grandTotalVnd)}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onIssueCeoDirective(
+                            `Tính báo giá đơn hàng in ${quoteInput.materialType.toUpperCase()} kích thước ${quoteInput.widthMeters}m x ${quoteInput.heightMeters}m, số lượng ${quoteInput.quantity} (${quoteResult.totalAreaSqm}m2). Tổng dự kiến ${formatVnd(quoteResult.grandTotalVnd)}.`,
+                            'high'
+                          );
+                          setShowCalculator(false);
+                        }}
+                        className="px-2.5 py-1 bg-amber-400 text-slate-950 font-semibold rounded cursor-pointer"
+                      >
+                        Ra chỉ thị lập báo giá
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Custom Directive / Task Form placed right near top for fast access */}
+                    <form onSubmit={handleTaskSubmit} className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          aria-label="Nhập nhiệm vụ giao cho trợ lý AI"
+                          placeholder={
+                            dispatchMode === 'ceo_auto'
+                              ? 'Nhập chỉ thị (VD: Cho báo giá số lượng 80m2 bạt)...'
+                              : `Giao nhiệm vụ trực tiếp cho ${selectedAgent.name}...`
+                          }
+                          value={taskPrompt}
+                          onChange={(e) => {
+                            setTaskPrompt(e.target.value);
+                            if (taskFormError) setTaskFormError('');
+                          }}
+                          className="flex-1 px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="submit"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>{dispatchMode === 'ceo_auto' ? 'Ra chỉ thị' : 'Thực thi'}</span>
+                        </button>
+                      </div>
+                      {taskFormError && (
+                        <p role="alert" className="text-xs text-rose-400">
+                          {taskFormError}
+                        </p>
+                      )}
+                    </form>
+
+                    {/* Immediate Inline Result Summary right under the input box so user never misses it */}
+                    {selectedTask && selectedTask.report && (
+                      <div className="px-2.5 py-1.5 bg-emerald-950/70 border border-emerald-500/50 rounded-lg text-[11px] flex flex-col gap-0.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-emerald-300 truncate">
+                            ✓ Phản hồi từ{' '}
+                            {selectedTask.coordinatorDispatch?.assignedAgentName ||
+                              agents.find((a) => a.id === selectedTask.agentId)?.name}
+                            :
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-300 shrink-0">
+                            {selectedTask.status === 'completed'
+                              ? 'Đã trả kết quả'
+                              : `Đang xử lý ${selectedTask.progress}%`}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-emerald-400 tabular-nums">
+                          {selectedTask.report.totalAmountFormatted ||
+                            selectedTask.report.headline}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Preset Directives / Tasks */}
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-slate-400">
+                        {dispatchMode === 'ceo_auto'
+                          ? 'Chỉ thị mẫu (Bấm để giao ngay qua Doraemon):'
+                          : `Nhiệm vụ mẫu của ${selectedAgent.name}:`}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {dispatchMode === 'ceo_auto'
+                          ? CEO_DIRECTIVE_PRESETS.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() =>
+                                  onIssueCeoDirective(preset.prompt, 'high')
+                                }
+                                className="px-2 py-1 text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-md text-left truncate max-w-full transition-colors cursor-pointer"
+                              >
+                                <span className="text-amber-300 font-medium">
+                                  + {preset.label}
+                                </span>{' '}
+                                <span className="text-slate-400">
+                                  {preset.expectedDeptHint}
+                                </span>
+                              </button>
+                            ))
+                          : selectedAgent.sampleTasks.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() =>
+                                  onAssignTask(
+                                    selectedAgent.id,
+                                    preset.prompt,
+                                    preset.targetZoneId,
+                                    preset.priority
+                                  )
+                                }
+                                className="px-2.5 py-1 text-xs bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 rounded-md text-left truncate max-w-full transition-colors cursor-pointer"
+                              >
+                                + {preset.label}
+                              </button>
+                            ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Right Column: Live Task Simulation & Executive Report Output */}
+              <div className="md:col-span-7 bg-slate-900/85 border border-slate-800 rounded-lg p-3.5 flex flex-col justify-between gap-2.5">
+                {/* Task Selector Bar */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    {tasks.slice(0, 4).map((t) => {
+                      const ag = agents.find((a) => a.id === t.agentId);
+                      const isSel = t.id === selectedTask?.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => onSelectTask(t.id)}
+                          className={`px-2.5 py-1 text-xs rounded-md border whitespace-nowrap shrink-0 cursor-pointer ${
+                            isSel
+                              ? 'bg-slate-800 text-amber-300 border-amber-400 font-semibold'
+                              : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {t.coordinatorDispatch?.isCeoDirective ? 'Chỉ thị GĐ → ' : ''}
+                          {ag?.name}: {t.title.slice(0, 22)}...
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedTask && (
+                    <span className="text-xs font-mono text-slate-400 tabular-nums shrink-0">
+                      Tiến độ: {selectedTask.progress}%
+                    </span>
+                  )}
+                </div>
+
+                {/* Selected Task Details & Report */}
+                {selectedTask ? (
+                  <div className="space-y-2 text-xs overflow-y-auto max-h-[215px] pr-1">
+                    {/* Headline & Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-bold text-sm text-white">
+                        {selectedTask.report?.headline || selectedTask.title}
+                      </div>
+                      <span
+                        className={`text-xs font-semibold shrink-0 ${
+                          selectedTask.status === 'rejected_scope'
+                            ? 'text-rose-400'
+                            : selectedTask.status === 'completed'
+                            ? 'text-emerald-400'
+                            : 'text-amber-400'
+                        }`}
+                      >
+                        {selectedTask.status === 'rejected_scope'
+                          ? 'Từ chối trái chuyên môn'
+                          : selectedTask.status === 'completed'
+                          ? 'Đã trả kết quả Báo cáo'
+                          : selectedTask.spatialStepText}
+                      </span>
+                    </div>
+
+                    {/* Prominent Final Result Banner right at the top */}
+                    {selectedTask.report?.totalAmountFormatted && (
+                      <div className="px-3 py-2 bg-emerald-950/60 border border-emerald-500/50 rounded-lg flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[11px] text-emerald-300 font-medium block">
+                            KẾT QUẢ BÁO CÁO / BÁO GIÁ TỪ{' '}
+                            {(
+                              selectedTask.coordinatorDispatch
+                                ?.assignedAgentName ||
+                              agents.find((a) => a.id === selectedTask.agentId)
+                                ?.name ||
+                              'TRỢ LÝ'
+                            ).toUpperCase()}
+                            :
+                          </span>
+                          <span className="text-sm font-bold text-emerald-400 tabular-nums">
+                            {selectedTask.report.totalAmountFormatted}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono text-amber-300">
+                          {selectedTask.report.appliedSopCodes.join(', ')}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Calculation Table placed immediately above the fold */}
+                    {selectedTask.report?.calculationRows &&
+                      selectedTask.report.calculationRows.length > 0 && (
+                        <div className="overflow-x-auto border border-slate-800 rounded-md">
+                          <table className="w-full text-left border-collapse text-[11px] tabular-nums">
+                            <thead>
+                              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                                <th className="py-1.5 px-2">Hạng mục</th>
+                                <th className="py-1.5 px-2">Chi tiết định mức SOP</th>
+                                <th className="py-1.5 px-2 text-right">Khối lượng</th>
+                                <th className="py-1.5 px-2 text-right">Đơn giá / CK</th>
+                                <th className="py-1.5 px-2 text-right">Thành tiền</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedTask.report.calculationRows.map((row, idx) => {
+                                const isTotalRow = row.item.startsWith('TỔNG');
+                                return (
+                                  <tr
+                                    key={idx}
+                                    className={`border-b border-slate-800/60 ${
+                                      isTotalRow
+                                        ? 'bg-emerald-950/40 text-emerald-300 font-bold'
+                                        : 'text-slate-200'
+                                    }`}
+                                  >
+                                    <td className="py-1 px-2 font-medium">{row.item}</td>
+                                    <td className="py-1 px-2 text-slate-400">{row.spec}</td>
+                                    <td className="py-1 px-2 text-right">{row.quantity}</td>
+                                    <td className="py-1 px-2 text-right">{row.unitPrice}</td>
+                                    <td className="py-1 px-2 text-right font-semibold text-amber-300">
+                                      {row.subtotal}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                    {/* Coordinator Dispatch Summary Box if routed by Doraemon */}
+                    {(selectedTask.coordinatorDispatch ||
+                      selectedTask.report?.coordinatorDispatch) && (
+                      <div className="p-2.5 bg-slate-950/90 border border-slate-800 rounded-lg space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                          <span className="font-semibold text-sky-400">
+                            Trưởng phòng Quản lý chung: Doraemon (Đô-rê-mon)
+                          </span>
+                          <span className="text-emerald-400 font-semibold">
+                            Đã điều phối →{' '}
+                            {
+                              (
+                                selectedTask.coordinatorDispatch ||
+                                selectedTask.report?.coordinatorDispatch
+                              )?.assignedAgentName
+                            }{' '}
+                            (
+                            {
+                              (
+                                selectedTask.coordinatorDispatch ||
+                                selectedTask.report?.coordinatorDispatch
+                              )?.assignedDepartmentLabel
+                            }
+                            )
+                          </span>
+                        </div>
+                        {(
+                          selectedTask.coordinatorDispatch ||
+                          selectedTask.report?.coordinatorDispatch
+                        )?.directorSummaryFromDoraemon && (
+                          <div className="text-[11px] text-amber-200 leading-relaxed">
+                            <strong className="text-amber-400">
+                              Doraemon báo cáo Giám đốc:{' '}
+                            </strong>
+                            {
+                              (
+                                selectedTask.coordinatorDispatch ||
+                                selectedTask.report?.coordinatorDispatch
+                              )?.directorSummaryFromDoraemon
+                            }
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selectedTask.report && (
+                      <>
+                        <p className="text-slate-300 leading-relaxed">
+                          {selectedTask.report.summary}
+                        </p>
+
+                        <ul className="space-y-1 text-slate-200 pl-1">
+                          {selectedTask.report.keyFindings.map((finding, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              {selectedTask.report?.scopeCheckPassed ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                              )}
+                              <span>{finding}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                          Đề xuất tiếp theo: {selectedTask.report.recommendation}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    Chưa có nhiệm vụ nào được chọn. Hãy giao nhiệm vụ mới ở cột bên trái.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: TRAINING SOP DOCUMENTS BY DEPARTMENT */}
+          {activeTab === 'sops' && (
+            <div className="p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 max-h-[255px] overflow-y-auto">
+              {/* Left: Existing Department SOP List */}
+              <div className="lg:col-span-7 flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-slate-200">
+                    Tài liệu Quy chuẩn Huấn luyện (SOP) theo Bộ phận:
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {agents.map((ag) => (
+                      <button
+                        key={ag.departmentId}
+                        type="button"
+                        onClick={() => setSopDeptId(ag.departmentId)}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                          sopDeptId === ag.departmentId
+                            ? 'bg-amber-400 text-slate-950 font-semibold'
+                            : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                        }`}
+                      >
+                        {ag.name} ({ag.departmentLabel.split(' ')[0]})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 overflow-y-auto max-h-[220px] pr-1">
+                  {deptSops.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="p-3 bg-slate-900/80 border border-slate-800 rounded-lg space-y-1.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-white">
+                          [{doc.code}] {doc.title}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onToggleSop(doc.id)}
+                          className={`px-2.5 py-0.5 text-[11px] font-semibold rounded border cursor-pointer whitespace-nowrap shrink-0 ${
+                            doc.isActive
+                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {doc.isActive ? 'Đang áp dụng' : 'Tạm tắt'}
+                        </button>
+                      </div>
+                      <p className="text-slate-400 text-[11px]">{doc.summary}</p>
+                      <ul className="space-y-1 text-slate-200 pl-1">
+                        {doc.rules.map((r, i) => (
+                          <li key={i}>• {r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right: Add / Upload New Training Document (SOP) */}
+              <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-lg p-3.5">
+                <form onSubmit={handleSopSubmit} className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <FolderPlus className="w-4 h-4 text-amber-400" />
+                      <span>Nạp Tài liệu Huấn luyện SOP Mới</span>
+                    </span>
+                    <label className="text-[11px] text-amber-400 hover:underline cursor-pointer">
+                      <span>Tải file (.txt/.md)</span>
+                      <input
+                        type="file"
+                        accept=".txt,.md,.csv,.json"
+                        onChange={handleFileUploadSop}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label htmlFor="sop-code-input" className="block text-[11px] text-slate-400 mb-0.5">
+                        Mã SOP
+                      </label>
+                      <input
+                        id="sop-code-input"
+                        type="text"
+                        value={sopCode}
+                        onChange={(e) => setSopCode(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white font-mono"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label htmlFor="sop-title-input" className="block text-[11px] text-slate-400 mb-0.5">
+                        Tên tài liệu quy chuẩn huấn luyện
+                      </label>
+                      <input
+                        id="sop-title-input"
+                        type="text"
+                        placeholder="VD: Quy chuẩn in UV phẳng trên Mica Đài Loan"
+                        value={sopTitle}
+                        onChange={(e) => {
+                          setSopTitle(e.target.value);
+                          if (sopError) setSopError('');
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="sop-rules-input" className="block text-[11px] text-slate-400 mb-0.5">
+                      Các quy tắc bắt buộc thực hiện (mỗi dòng 1 quy chuẩn):
+                    </label>
+                    <textarea
+                      id="sop-rules-input"
+                      rows={3}
+                      placeholder="- Đơn giá in UV phẳng Mica 5mm: 320.000đ/m2&#10;- Bắt buộc in lót trắng (White Ink) với Mica trong suốt"
+                      value={sopRulesText}
+                      onChange={(e) => {
+                        setSopRulesText(e.target.value);
+                        if (sopError) setSopError('');
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-white"
+                    />
+                  </div>
+
+                  {sopError && (
+                    <p role="alert" className="text-xs text-rose-400">
+                      {sopError}
+                    </p>
+                  )}
+                  {sopSuccess && (
+                    <p role="status" className="text-xs text-emerald-400">
+                      {sopSuccess}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Huấn luyện & Lưu vào Bộ phận Đang chọn
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};

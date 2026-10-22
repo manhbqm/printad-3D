@@ -1,0 +1,6 @@
+{
+  "name": "PrintAd 3D Virtual Office",
+  "description": "Không gian văn phòng ảo 3D cho công ty in ấn quảng cáo với 5 trợ lý AI chuyên biệt theo từng bộ phận, huấn luyện theo tài liệu quy chuẩn SOP và mô phỏng thực thi nhiệm vụ trực quan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
