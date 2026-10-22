@@ -93,8 +93,9 @@ ${deptSopsText}
 
 Hãy thực hiện nhiệm vụ người dùng giao theo đúng quy chuẩn SOP trên và trả về báo cáo ngắn gọn, súc tích, chuyên nghiệp bằng tiếng Việt.`;
 
+      const modelName = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: modelName,
         contents: `Nhiệm vụ được giao: "${taskPrompt}"`,
         config: {
           systemInstruction,
