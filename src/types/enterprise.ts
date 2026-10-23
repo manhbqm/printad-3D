@@ -120,3 +120,99 @@ export interface ExternalOrderResult {
   botResponseMessage: string;
   processedAt: string;
 }
+
+// =========================================================================
+// BAM-INSPIRED PROTOCOLS: QUOTA MANAGER, TERSE DIALECT & KPI METRICS
+// =========================================================================
+
+export type AiProviderType = 'openai' | 'anthropic' | 'gemini' | 'groq' | 'local';
+export type QuotaStatus = 'ready' | 'resting' | 'recovered';
+
+export interface QuotaRestRecord {
+  id: string;
+  agentId: string;
+  agentName: string;
+  characterKey: string;
+  provider: AiProviderType;
+  status: QuotaStatus;
+  triggeredAt: string;
+  cooldownUntil: string;
+  durationSec: number;
+  reason: string;
+  autoRecovered: boolean;
+}
+
+export type TerseAction =
+  | 'DIRECTIVE'
+  | 'CALC_QUOTE'
+  | 'CHECK_SOP'
+  | 'GATE_APPROVAL'
+  | 'QC_8D'
+  | 'REPORT_RESULT'
+  | 'REST_COOLDOWN';
+
+export type TerseStatus = 'OK' | 'REJECT' | 'WAIT' | 'REST' | 'LOCK' | 'RUSH';
+
+export interface TerseMessagePayload {
+  from: string;
+  to: string;
+  action: TerseAction;
+  refId: string;
+  status: TerseStatus;
+  metrics?: Record<string, string | number>;
+  note: string;
+}
+
+export interface TerseMessageParsed extends TerseMessagePayload {
+  raw: string;
+  timestamp: string;
+}
+
+export interface TokenSavingsEstimate {
+  verboseTokens: number;
+  terseTokens: number;
+  savedTokens: number;
+  savingPercent: number;
+}
+
+export interface AgentKpiRecord {
+  agentId: string;
+  agentName: string;
+  characterKey: string;
+  departmentId: DepartmentId;
+  roleTier: string;
+  tasksAssigned: number;
+  tasksCompleted: number;
+  tasksRejected: number;
+  totalLatencyMs: number;
+  avgLatencyMs: number;
+  tokensUsed: number;
+  tokensSaved: number;
+  rateLimitHits: number;
+  isResting: boolean;
+  restRemainingSec: number;
+  lastActiveAt: string;
+}
+
+export interface KpiSummaryMetrics {
+  totalTasksProcessed: number;
+  overallAvgLatencyMs: number;
+  overallSopComplianceRate: number;
+  totalTokensConsumed: number;
+  totalTokensSaved: number;
+  estimatedVndSaved: number;
+  currentlyRestingAgents: number;
+  staleTasksCount: number;
+}
+
+export interface StaleTaskAlert {
+  taskId: string;
+  agentId: string;
+  agentName: string;
+  taskTitle: string;
+  pendingSince: string;
+  elapsedSec: number;
+  isStale: boolean;
+  recommendedAction: string;
+}
+

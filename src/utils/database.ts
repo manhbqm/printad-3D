@@ -1,4 +1,4 @@
-import { ApprovalCard, DocumentRecord, OrderRecord, AutomationRunLog } from '../types/enterprise';
+import { ApprovalCard, DocumentRecord, OrderRecord, AutomationRunLog, AgentKpiRecord } from '../types/enterprise';
 
 export interface DatabaseStats {
   totalOrders: number;
@@ -16,6 +16,7 @@ export class EnterpriseDatabase {
   private memoryDocs: Map<string, DocumentRecord> = new Map();
   private memoryApprovals: Map<string, ApprovalCard> = new Map();
   private memoryAutomations: Map<string, AutomationRunLog> = new Map();
+  private memoryKpis: Map<string, AgentKpiRecord> = new Map();
 
   constructor(dbPath?: string) {
     this.init(dbPath);
@@ -126,6 +127,23 @@ export class EnterpriseDatabase {
         report_headline TEXT,
         key_findings_json TEXT,
         total_amount_formatted TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS agent_kpis (
+        agent_id TEXT PRIMARY KEY,
+        agent_name TEXT,
+        character_key TEXT,
+        department_id TEXT,
+        role_tier TEXT,
+        tasks_assigned INTEGER,
+        tasks_completed INTEGER,
+        tasks_rejected INTEGER,
+        total_latency_ms INTEGER,
+        avg_latency_ms INTEGER,
+        tokens_used INTEGER,
+        tokens_saved INTEGER,
+        rate_limit_hits INTEGER,
+        last_active_at TEXT
       );
     `);
 
@@ -582,6 +600,81 @@ export class EnterpriseDatabase {
     return Array.from(this.memoryAutomations.values())
       .sort((a, b) => b.executedAt.localeCompare(a.executedAt))
       .slice(0, limit);
+  }
+
+  // --- AGENT KPIS ---
+  public upsertAgentKpi(kpi: AgentKpiRecord): void {
+    if (this.isSqlite && this.db) {
+      const stmt = this.db.prepare(`
+        INSERT INTO agent_kpis (
+          agent_id, agent_name, character_key, department_id, role_tier,
+          tasks_assigned, tasks_completed, tasks_rejected,
+          total_latency_ms, avg_latency_ms, tokens_used, tokens_saved,
+          rate_limit_hits, last_active_at
+        ) VALUES (
+          ?, ?, ?, ?, ?,
+          ?, ?, ?,
+          ?, ?, ?, ?,
+          ?, ?
+        )
+        ON CONFLICT(agent_id) DO UPDATE SET
+          agent_name = excluded.agent_name,
+          character_key = excluded.character_key,
+          department_id = excluded.department_id,
+          role_tier = excluded.role_tier,
+          tasks_assigned = excluded.tasks_assigned,
+          tasks_completed = excluded.tasks_completed,
+          tasks_rejected = excluded.tasks_rejected,
+          total_latency_ms = excluded.total_latency_ms,
+          avg_latency_ms = excluded.avg_latency_ms,
+          tokens_used = excluded.tokens_used,
+          tokens_saved = excluded.tokens_saved,
+          rate_limit_hits = excluded.rate_limit_hits,
+          last_active_at = excluded.last_active_at
+      `);
+      stmt.run(
+        kpi.agentId,
+        kpi.agentName,
+        kpi.characterKey,
+        kpi.departmentId,
+        kpi.roleTier,
+        kpi.tasksAssigned,
+        kpi.tasksCompleted,
+        kpi.tasksRejected,
+        kpi.totalLatencyMs,
+        kpi.avgLatencyMs,
+        kpi.tokensUsed,
+        kpi.tokensSaved,
+        kpi.rateLimitHits,
+        kpi.lastActiveAt
+      );
+    }
+    this.memoryKpis.set(kpi.agentId, { ...kpi });
+  }
+
+  public getAgentKpis(): AgentKpiRecord[] {
+    if (this.isSqlite && this.db) {
+      const rows = this.db.prepare('SELECT * FROM agent_kpis ORDER BY tasks_completed DESC').all();
+      return rows.map((r: any) => ({
+        agentId: r.agent_id,
+        agentName: r.agent_name,
+        characterKey: r.character_key,
+        departmentId: r.department_id,
+        roleTier: r.role_tier,
+        tasksAssigned: r.tasks_assigned,
+        tasksCompleted: r.tasks_completed,
+        tasksRejected: r.tasks_rejected,
+        totalLatencyMs: r.total_latency_ms,
+        avgLatencyMs: r.avg_latency_ms,
+        tokensUsed: r.tokens_used,
+        tokensSaved: r.tokens_saved,
+        rateLimitHits: r.rate_limit_hits,
+        isResting: false,
+        restRemainingSec: 0,
+        lastActiveAt: r.last_active_at
+      }));
+    }
+    return Array.from(this.memoryKpis.values()).sort((a, b) => b.tasksCompleted - a.tasksCompleted);
   }
 
   // --- METRICS ---

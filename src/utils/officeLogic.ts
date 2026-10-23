@@ -1770,8 +1770,30 @@ export function computeAgentWaypoint(
   activeTasks: TaskAssignment[],
   zones: OfficeZone[],
   isAllHandsMeeting: boolean,
-  agentIndex: number
+  agentIndex: number,
+  isRestingQuota?: boolean,
+  restReason?: string
 ): { position: Vector3Tuple; lookAt: Vector3Tuple; stateLabel: string; isMovingTarget: boolean } {
+  // BAM-inspired resting state: When AI hits rate limit or quota exhaustion, agent walks to Central Lounge / Coffee Bar
+  if (isRestingQuota) {
+    const loungeSpots: Vector3Tuple[] = [
+      { x: -1.5, y: 0, z: -1.8 },
+      { x: -0.7, y: 0, z: -1.4 },
+      { x: -2.2, y: 0, z: -1.4 },
+      { x: -1.1, y: 0, z: -2.3 },
+      { x: -1.9, y: 0, z: -2.3 },
+      { x: 5.8, y: 0, z: 0.2 },
+      { x: 9.2, y: 0, z: 0.2 }
+    ];
+    const spot = loungeSpots[agentIndex % loungeSpots.length];
+    return {
+      position: spot,
+      lookAt: { x: -1.5, y: 0.5, z: -1.8 },
+      stateLabel: restReason || '☕ Nghỉ ngơi Lounge (Chờ quota reset...)',
+      isMovingTarget: true
+    };
+  }
+
   if (isAllHandsMeeting) {
     const meetingSeats: Vector3Tuple[] = [
       { x: -3.5, y: 0, z: -5.8 },

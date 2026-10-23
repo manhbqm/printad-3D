@@ -13,6 +13,7 @@ import {
   computeAgentWaypoint,
   getActiveSocialDialogue
 } from '../utils/officeLogic';
+import { quotaManager } from '../utils/aiQuotaManager';
 import {
   buildDetailedAgencyStaffCharacter,
   buildDetailedDoraemonCharacter
@@ -2473,12 +2474,15 @@ export const VirtualOffice3D: React.FC<VirtualOffice3DProps> = ({
       let talkingCharactersCount = 0;
 
       agentRigs.forEach((rig, idx) => {
+        const restStatus = quotaManager.getAgentRestStatus(rig.agent.id);
         const wp = computeAgentWaypoint(
           rig.agent,
           currentProps.tasks,
           currentProps.zones,
           currentProps.isAllHandsMeeting,
-          idx
+          idx,
+          Boolean(restStatus?.isResting),
+          restStatus?.remainingSec ? `☕ Nghỉ ngơi Lounge (Reset sau ${restStatus.remainingSec}s)` : undefined
         );
 
         const isTaskBusy =

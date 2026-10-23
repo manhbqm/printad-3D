@@ -28,7 +28,12 @@ import {
   Video,
   X,
   XCircle,
-  Zap
+  Zap,
+  BarChart3,
+  Activity,
+  Cpu,
+  Coffee,
+  Award
 } from 'lucide-react';
 import { SKILLS_CATALOG } from '../data/officeData';
 import { CLOUD_PRINT_QUOTE_URL } from '../utils/printQuoteEngine';
@@ -59,6 +64,15 @@ import { db } from '../utils/database';
 import { resolveApprovalCard } from '../utils/approvalEngine';
 import { INITIAL_AUTOMATION_JOBS, executeAutomationJob } from '../utils/automationEngine';
 import { processExternalIncomingOrder } from '../utils/channelGateway';
+import { quotaManager } from '../utils/aiQuotaManager';
+import { kpiTracker } from '../utils/kpiTracker';
+import {
+  formatTerseMessage,
+  parseTerseMessage,
+  expandTerseToUserFacing,
+  estimateTokenSavings
+} from '../utils/terseProtocol';
+import { AgentKpiRecord, KpiSummaryMetrics, StaleTaskAlert } from '../types/enterprise';
 
 export type DockTab =
   | 'zones'
@@ -68,7 +82,8 @@ export type DockTab =
   | 'approvals'
   | 'automations'
   | 'database'
-  | 'channels';
+  | 'channels'
+  | 'kpi';
 
 interface BottomControlDockProps {
   activeTab: DockTab;
@@ -267,6 +282,90 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
   const [webhookDiscount, setWebhookDiscount] = useState<number>(18);
   const [webhookMsg, setWebhookMsg] = useState<string>('Cần in gấp 2 tấm bạt Hiflex 20m x 5m căng bảng hiệu siêu thị, giao trong 24h.');
   const [webhookResult, setWebhookResult] = useState<ExternalOrderResult | null>(null);
+
+  // BAM Innovations: KPI, Quota Rest & Terse Protocol State
+  const [kpiSummary, setKpiSummary] = useState<KpiSummaryMetrics>(kpiTracker.getKpiSummary());
+  const [agentKpis, setAgentKpis] = useState<AgentKpiRecord[]>(kpiTracker.getAllAgentKpis());
+  const [staleAlerts, setStaleAlerts] = useState<StaleTaskAlert[]>(kpiTracker.checkStaleTasks(tasks, 60));
+  const [restingCount, setRestingCount] = useState<number>(quotaManager.getAllRestingAgents().length);
+  const [terseFeed, setTerseFeed] = useState<string[]>([
+    '[CALC_QUOTE] @doraemon -> @shizuka [#PO-8812] 🟢 OK {m2=2000,vat=8%,total=68M} : Báo giá bạt Takata hoàn tất (-78% tokens)',
+    '[SOP_VERIFY] @shizuka -> @nobita [#ORD-902] 🟢 OK {machine=Komori_GL440,sheets=5200} : Kiểm tra bài in tờ rơi đạt chuẩn (-74% tokens)',
+    '[GATE_APPROVAL] @shizuka -> @doraemon [#ORD-991] 🔒 LOCK {total=45M,discount=18%} : Cần phê duyệt chiết khấu CEO (-71% tokens)',
+    '[QC_8D] @dekisugi -> @chaian [#QC-401] 🟢 OK {defect=0.02%,d8=pass} : Kiểm định xuất xưởng đạt ISO 12647 (-76% tokens)'
+  ]);
+  const [selectedTerseDetail, setSelectedTerseDetail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = quotaManager.subscribe(() => {
+      setRestingCount(quotaManager.getAllRestingAgents().length);
+      setAgentKpis(kpiTracker.getAllAgentKpis());
+      setKpiSummary(kpiTracker.getKpiSummary());
+    });
+
+    const interval = setInterval(() => {
+      setRestingCount(quotaManager.getAllRestingAgents().length);
+      setAgentKpis(kpiTracker.getAllAgentKpis());
+      setKpiSummary(kpiTracker.getKpiSummary());
+      setStaleAlerts(kpiTracker.checkStaleTasks(tasks, 60));
+    }, 2000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, [tasks]);
+
+  const handleSimulateTerseInteraction = () => {
+    const sampleMsgs = [
+      formatTerseMessage({
+        from: 'doraemon',
+        to: 'shizuka',
+        action: 'CALC_QUOTE',
+        refId: 'ORD-' + Math.floor(1000 + Math.random() * 9000),
+        status: 'OK',
+        metrics: { m2: Math.floor(100 + Math.random() * 800), total: (Math.floor(5 + Math.random() * 40)) + 'M' },
+        note: 'Báo giá nhanh hoàn tất, độ trễ 180ms (-75% tokens)'
+      }),
+      formatTerseMessage({
+        from: 'shizuka',
+        to: 'nobita',
+        action: 'CHECK_SOP',
+        refId: 'ORD-' + Math.floor(1000 + Math.random() * 9000),
+        status: 'OK',
+        metrics: { machine: 'Heidelberg_XL75', waste: '4.2%' },
+        note: 'Khổ giấy đã dàn trang chuẩn bù hao (-72% tokens)'
+      }),
+      formatTerseMessage({
+        from: 'doraemon',
+        to: 'dorami',
+        action: 'GATE_APPROVAL',
+        refId: 'ORD-' + Math.floor(1000 + Math.random() * 9000),
+        status: 'LOCK',
+        metrics: { total: '55M', rule: 'RULE_OVER_50M' },
+        note: 'Đã chặn rủi ro và chuyển Cổng Phê Duyệt (-79% tokens)'
+      })
+    ];
+    const picked = sampleMsgs[Math.floor(Math.random() * sampleMsgs.length)];
+    setTerseFeed((prev) => [picked, ...prev.slice(0, 9)]);
+  };
+
+  const handleToggleAgentRest = (agent: AgentKpiRecord) => {
+    if (agent.isResting) {
+      quotaManager.wakeAgent(agent.agentId);
+    } else {
+      quotaManager.triggerRateLimit(
+        agent.agentId,
+        agent.agentName,
+        agent.characterKey,
+        'groq',
+        60,
+        'Mô phỏng Rate-Limit 429: Nhân sự đi vào Pantry nghỉ ngơi 60s'
+      );
+    }
+    setRestingCount(quotaManager.getAllRestingAgents().length);
+    setAgentKpis(kpiTracker.getAllAgentKpis());
+  };
 
   // Sync state helper
   const refreshEnterpriseData = () => {
@@ -584,6 +683,27 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                 <Radio className="w-3.5 h-3.5 text-purple-400" />
                 <span>Kênh Ngoại Vi (Webhook)</span>
               </button>
+
+              {/* TAB 9: BAM KPIS & QUOTA MONITOR */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'kpi'}
+                onClick={() => setActiveTab('kpi')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'kpi'
+                    ? 'bg-amber-400 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Năng Suất & KPIs AI</span>
+                {restingCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] bg-indigo-500 text-white rounded-full font-bold animate-pulse">
+                    ☕ {restingCount} nghỉ
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="hidden lg:flex items-center gap-2 text-xs text-slate-400 whitespace-nowrap shrink-0">
@@ -847,6 +967,255 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: BAM INNOVATIONS: AGENT KPIS, QUOTA REST & TERSE DIALECT */}
+          {activeTab === 'kpi' && (
+            <div className="p-3.5 space-y-3.5 max-h-[275px] overflow-y-auto">
+              {/* 4 TOP HERO KPI CARDS */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      Độ Trễ Phản Hồi TB
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 rounded font-mono">
+                      Siêu Tốc
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold font-mono text-white">
+                    {kpiSummary.overallAvgLatencyMs} ms
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Groq LPU 0.3s + Local SOP Engine
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      Chuẩn Hóa SOP
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 rounded font-mono">
+                      Đạt Chuẩn
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold font-mono text-emerald-400">
+                    {kpiSummary.overallSopComplianceRate}%
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {kpiSummary.totalTasksProcessed} nhiệm vụ sản xuất
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Award className="w-3.5 h-3.5 text-sky-400" />
+                      Tiết Kiệm Token (BAMshort)
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-sky-500/20 text-sky-400 rounded font-mono">
+                      -75% Cost
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold font-mono text-sky-400">
+                    {kpiSummary.estimatedVndSaved.toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Đã giảm {(kpiSummary.totalTokensSaved / 1000).toFixed(0)}k token bloat
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Coffee className="w-3.5 h-3.5 text-indigo-400" />
+                      Nhân Sự & Quota 3D
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded font-mono">
+                      Pantry Walk
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold font-mono text-white">
+                    {17 - restingCount} <span className="text-sm font-normal text-slate-400">/ 17 sẵn sàng</span>
+                  </div>
+                  <div className="text-[10px] text-indigo-400">
+                    {restingCount > 0 ? `☕ ${restingCount} nhân sự đang nghỉ ngơi` : 'Tất cả nhân sự tại vị trí'}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: TERSE BAMSHORT STREAM & STALE ALERT */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                {/* Left 7 cols: Live Terse BAMshort Inter-agent Dialect */}
+                <div className="lg:col-span-7 bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span className="text-xs font-bold text-white">
+                        Luồng Giao Tiếp BAMshort Nội Bộ (Tiết Kiệm Token Tối Đa)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSimulateTerseInteraction}
+                      className="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-amber-300 rounded border border-slate-700 cursor-pointer transition-colors"
+                    >
+                      + Mô Phỏng Giao Tiếp
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[120px] overflow-y-auto font-mono text-[10.5px]">
+                    {terseFeed.map((msg, mIdx) => (
+                      <div
+                        key={mIdx}
+                        onClick={() => {
+                          const parsed = parseTerseMessage(msg.split(' (-')[0]);
+                          if (parsed) setSelectedTerseDetail(expandTerseToUserFacing(parsed));
+                        }}
+                        className="p-1.5 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/80 rounded text-slate-300 flex items-center justify-between cursor-pointer transition-colors"
+                      >
+                        <span className="truncate pr-2">{msg}</span>
+                        <span className="text-[9px] text-amber-400 whitespace-nowrap">Xem dịch ➔</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {selectedTerseDetail && (
+                    <div className="p-2 bg-slate-900 border border-amber-500/40 rounded-lg text-xs space-y-1 text-slate-200">
+                      <div className="flex items-center justify-between text-amber-400 font-bold text-[11px]">
+                        <span>Dịch Thuyết Minh Cho Người Dùng (User-Facing):</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTerseDetail(null)}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <pre className="text-[10px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">
+                        {selectedTerseDetail}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right 5 cols: Stale Task Monitor & Quota Status */}
+                <div className="lg:col-span-5 bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      Giám Sát Tắc Nghẽn (Stale SLA)
+                    </span>
+                    <span className="text-[10px] text-slate-400">Ngưỡng: 60s</span>
+                  </div>
+
+                  {staleAlerts.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {staleAlerts.map((alert) => (
+                        <div
+                          key={alert.taskId}
+                          className="p-2 bg-rose-950/40 border border-rose-500/40 rounded-lg space-y-1 text-xs"
+                        >
+                          <div className="flex items-center justify-between text-rose-300 font-bold">
+                            <span>⚠️ {alert.agentName}</span>
+                            <span className="font-mono text-[10px]">{alert.elapsedSec}s trễ</span>
+                          </div>
+                          <div className="text-[11px] text-slate-300 truncate">{alert.taskTitle}</div>
+                          <div className="text-[10px] text-amber-300">{alert.recommendedAction}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-slate-400 text-xs flex flex-col items-center gap-1">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 opacity-60" />
+                      <span>Không có nhiệm vụ nào bị tắc nghẽn.</span>
+                      <span className="text-[10px] text-slate-500">Mọi quy trình phản hồi &lt;300ms</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* TABLE: 17 DORAEMON AI AGENTS WITH REST CONTROLS */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-white">
+                      Bảng Quản Trị Năng Suất 17 Nhân Sự AI & Điều Khiển 3D Lounge Walk
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Bấm "Nghỉ ngơi" để nhân sự 3D tự động rời bàn đi vào Pantry & Cà phê
+                  </span>
+                </div>
+
+                <div className="max-h-[160px] overflow-y-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="text-[11px] bg-slate-900/90 text-slate-400 sticky top-0 border-b border-slate-800">
+                      <tr>
+                        <th className="px-3 py-1.5 font-medium">Nhân Sự & Vai Trò</th>
+                        <th className="px-3 py-1.5 font-medium">Mô Hình Đảm Nhiệm</th>
+                        <th className="px-3 py-1.5 font-medium text-center">Tác Vụ Hoàn Tất</th>
+                        <th className="px-3 py-1.5 font-medium text-center">Độ Trễ TB</th>
+                        <th className="px-3 py-1.5 font-medium text-center">Trạng Thái 3D</th>
+                        <th className="px-3 py-1.5 font-medium text-right">Điều Khiển</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {agentKpis.map((kpi) => {
+                        const modelCfg = getAgentModelConfig(kpi.characterKey as any);
+                        return (
+                          <tr key={kpi.agentId} className="hover:bg-slate-900/40 transition-colors">
+                            <td className="px-3 py-1.5 font-sans font-medium text-white flex items-center gap-2">
+                              <span>{kpi.isResting ? '☕' : '👤'}</span>
+                              <span>{kpi.agentName}</span>
+                            </td>
+                            <td className="px-3 py-1.5 font-sans text-slate-300">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700">
+                                {modelCfg.providerName} ({modelCfg.modelName})
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 text-center text-emerald-400 font-bold">
+                              {kpi.tasksCompleted}
+                            </td>
+                            <td className="px-3 py-1.5 text-center text-slate-300">
+                              {kpi.avgLatencyMs}ms
+                            </td>
+                            <td className="px-3 py-1.5 text-center">
+                              {kpi.isResting ? (
+                                <span className="px-2 py-0.5 text-[10px] bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 rounded-full font-sans font-semibold animate-pulse">
+                                  ☕ Nghỉ Lounge ({kpi.restRemainingSec}s)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full font-sans font-semibold">
+                                  🟢 Tại bàn làm việc
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-sans">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAgentRest(kpi)}
+                                className={`px-2.5 py-1 text-[10.5px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                                  kpi.isResting
+                                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                    : 'bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700'
+                                }`}
+                              >
+                                {kpi.isResting ? 'Đánh thức ngay' : 'Cho nghỉ 60s'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
