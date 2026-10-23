@@ -14,6 +14,18 @@ import {
   getAgentTier
 } from './src/utils/aiMultiModelDispatcher';
 import { AgentProfile, SopDocument, TaskReport } from './src/types/office';
+import { db } from './src/utils/database';
+import {
+  createApprovalCard,
+  evaluateApprovalRequired,
+  resolveApprovalCard
+} from './src/utils/approvalEngine';
+import {
+  INITIAL_AUTOMATION_JOBS,
+  executeAutomationJob
+} from './src/utils/automationEngine';
+import { processExternalIncomingOrder } from './src/utils/channelGateway';
+import { ExternalOrderPayload, OrderRecord } from './src/types/enterprise';
 
 dotenv.config();
 
@@ -133,7 +145,78 @@ async function startServer() {
         allAgents: agentList
       });
 
-      res.json({ report });
+      // Parse raw numeric amount if present
+      let rawAmount = 0;
+      if (report.totalAmountFormatted) {
+        const cleaned = report.totalAmountFormatted.replace(/[^\d]/g, '');
+        rawAmount = parseInt(cleaned, 10) || 0;
+      }
+
+      // Check Approval Gate evaluation
+      const evaluation = evaluateApprovalRequired({
+        rawAmountVnd: rawAmount,
+        taskPrompt,
+        report,
+        documentType: report.formalDocument?.documentType
+      });
+
+      let approvalCard = undefined;
+      const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+      const taskId = `task-${Date.now()}`;
+
+      if (evaluation.requiresApproval) {
+        approvalCard = createApprovalCard({
+          taskId,
+          orderId,
+          title: `Duyệt: ${report.headline} (${report.totalAmountFormatted || 'Văn bản B2B'})`,
+          departmentId: targetAgent.departmentId,
+          agentId: targetAgent.id,
+          agentName: targetAgent.name,
+          evaluation,
+          totalAmountFormatted: report.totalAmountFormatted || 'Theo quy chuẩn SOP',
+          rawAmountVnd: rawAmount,
+          discountPercent: rawAmount > 50000000 ? 18 : 10,
+          customerName: 'Khách hàng B2B PrintAd',
+          productSummary: report.headline,
+          documentType: report.formalDocument?.documentType
+        });
+        db.saveApprovalCard(approvalCard);
+      }
+
+      // Persist Document if exists
+      if (report.formalDocument) {
+        db.saveDocument({
+          id: report.formalDocument.id || `doc-${Date.now()}`,
+          orderId,
+          documentType: report.formalDocument.documentType,
+          title: report.formalDocument.title,
+          documentNumber: report.formalDocument.documentNumber || `PA-${Date.now().toString().slice(-4)}`,
+          content: report.formalDocument.content,
+          legalBasis: 'Nghị định 30/2020/NĐ-CP & Luật Thương mại 2005',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Persist Order
+      const orderRec: OrderRecord = {
+        id: orderId,
+        taskId,
+        customerName: 'Khách hàng B2B Doanh Nghiệp',
+        productType: targetAgent.departmentId,
+        specsSummary: report.headline,
+        quantity: 1,
+        subtotalVnd: rawAmount,
+        discountPercent: 10,
+        vatVnd: Math.round(rawAmount * 0.08),
+        grandTotalVnd: rawAmount,
+        status: evaluation.requiresApproval ? 'pending_approval' : 'approved',
+        formalDocumentId: report.formalDocument?.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.saveOrder(orderRec);
+
+      res.json({ report, approvalCard, order: orderRec });
     } catch (err: any) {
       console.error('[ExecuteTask] Error:', err);
       const { agent, prompt, sops, allAgents } = req.body || {};
@@ -144,6 +227,84 @@ async function startServer() {
         Array.isArray(sops) ? sops : INITIAL_SOP_DOCUMENTS
       );
       res.json({ report: fallback });
+    }
+  });
+
+  // --- APPROVAL GATE ENDPOINTS ---
+  app.get('/api/approvals', (req, res) => {
+    const statusFilter = req.query.status as any;
+    const cards = db.listApprovalCards(statusFilter && statusFilter !== 'all' ? statusFilter : undefined);
+    const stats = db.getStats();
+    res.json({ approvals: cards, stats });
+  });
+
+  app.post('/api/approvals/:id/decision', (req, res) => {
+    const { id } = req.params;
+    const { decision, note, reviewerName } = req.body as {
+      decision: 'approved' | 'rejected' | 'revision_requested';
+      note?: string;
+      reviewerName?: string;
+    };
+
+    const card = db.getApprovalCard(id);
+    if (!card) {
+      res.status(404).json({ error: 'Không tìm thấy thẻ phê duyệt.' });
+      return;
+    }
+
+    const resolved = resolveApprovalCard(card, decision, reviewerName || 'Doraemon (Giám Đốc)', note);
+    db.saveApprovalCard(resolved);
+
+    if (resolved.orderId) {
+      const orderStatus = decision === 'approved' ? 'approved' : decision === 'rejected' ? 'rejected' : 'draft';
+      db.updateOrderStatus(resolved.orderId, orderStatus);
+    }
+
+    res.json({ success: true, approvalCard: resolved });
+  });
+
+  // --- DATABASE & ORDERS ENDPOINTS ---
+  app.get('/api/database/orders', (req, res) => {
+    const limit = parseInt(String(req.query.limit || '50'), 10);
+    const orders = db.listOrders(limit);
+    const stats = db.getStats();
+    res.json({ orders, stats });
+  });
+
+  app.get('/api/database/documents', (req, res) => {
+    const limit = parseInt(String(req.query.limit || '30'), 10);
+    const documents = db.listDocuments(limit);
+    res.json({ documents });
+  });
+
+  // --- AUTOMATIONS & CRON ENDPOINTS ---
+  app.get('/api/automations', (_req, res) => {
+    const history = db.listAutomationRuns(20);
+    res.json({ jobs: INITIAL_AUTOMATION_JOBS, history });
+  });
+
+  app.post('/api/automations/:id/trigger', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const log = await executeAutomationJob(id, INITIAL_SOP_DOCUMENTS, INITIAL_AGENTS);
+      res.json({ success: true, log });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi thực thi automation.' });
+    }
+  });
+
+  // --- EXTERNAL CHANNELS / WEBHOOK ENDPOINT ---
+  app.post('/api/channels/incoming', (req, res) => {
+    try {
+      const payload = req.body as ExternalOrderPayload;
+      if (!payload || !payload.senderName) {
+        res.status(400).json({ error: 'Payload không hợp lệ, thiếu tên người gửi.' });
+        return;
+      }
+      const result = processExternalIncomingOrder(payload, INITIAL_AGENTS, INITIAL_SOP_DOCUMENTS);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'Lỗi tiếp nhận đơn hàng ngoại vi.' });
     }
   });
 

@@ -1,23 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
+  AlertTriangle,
+  ArrowRight,
   Bot,
   Building2,
   Calculator,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
+  Database,
   FileSpreadsheet,
   FileText,
   FolderPlus,
   KeyRound,
   Layers,
+  MessageSquare,
   Play,
+  Radio,
+  RefreshCw,
   Send,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Users,
   Video,
   X,
+  XCircle,
   Zap
 } from 'lucide-react';
 import { SKILLS_CATALOG } from '../data/officeData';
@@ -33,12 +43,32 @@ import {
   ZoneId
 } from '../types/office';
 import {
+  ApprovalCard,
+  AutomationJob,
+  AutomationRunLog,
+  DocumentRecord,
+  ExternalOrderResult,
+  OrderRecord
+} from '../types/enterprise';
+import {
   calculatePrintQuote,
   formatVnd,
   validateSopDocumentInput
 } from '../utils/officeLogic';
+import { db } from '../utils/database';
+import { resolveApprovalCard } from '../utils/approvalEngine';
+import { INITIAL_AUTOMATION_JOBS, executeAutomationJob } from '../utils/automationEngine';
+import { processExternalIncomingOrder } from '../utils/channelGateway';
 
-export type DockTab = 'zones' | 'agents' | 'tasks' | 'sops';
+export type DockTab =
+  | 'zones'
+  | 'agents'
+  | 'tasks'
+  | 'sops'
+  | 'approvals'
+  | 'automations'
+  | 'database'
+  | 'channels';
 
 interface BottomControlDockProps {
   activeTab: DockTab;
@@ -210,6 +240,87 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
   const [skillSearchQuery, setSkillSearchQuery] = useState<string>('');
 
   const quoteResult = calculatePrintQuote(quoteInput);
+
+  // --- ENTERPRISE APPROVAL GATE STATE ---
+  const [approvals, setApprovals] = useState<ApprovalCard[]>(() => db.listApprovalCards());
+  const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [approvalActionMsg, setApprovalActionMsg] = useState<string>('');
+
+  // --- AUTOMATIONS STATE ---
+  const [automationJobs, setAutomationJobs] = useState<AutomationJob[]>(INITIAL_AUTOMATION_JOBS);
+  const [automationHistory, setAutomationHistory] = useState<AutomationRunLog[]>(() => db.listAutomationRuns(10));
+  const [runningJobId, setRunningJobId] = useState<string | null>(null);
+
+  // --- DATABASE & ORDERS STATE ---
+  const [orders, setOrders] = useState<OrderRecord[]>(() => db.listOrders(50));
+  const [documents, setDocuments] = useState<DocumentRecord[]>(() => db.listDocuments(20));
+  const [dbStats, setDbStats] = useState(() => db.getStats());
+
+  // --- EXTERNAL CHANNELS / WEBHOOK STATE ---
+  const [webhookSource, setWebhookSource] = useState<'telegram' | 'zalo' | 'web_portal'>('telegram');
+  const [webhookSender, setWebhookSender] = useState<string>('Anh Tuấn (Chuỗi Takata Mart)');
+  const [webhookMaterial, setWebhookMaterial] = useState<string>('hiflex');
+  const [webhookWidth, setWebhookWidth] = useState<number>(20);
+  const [webhookHeight, setWebhookHeight] = useState<number>(5);
+  const [webhookQty, setWebhookQty] = useState<number>(2);
+  const [webhookRush, setWebhookRush] = useState<boolean>(true);
+  const [webhookDiscount, setWebhookDiscount] = useState<number>(18);
+  const [webhookMsg, setWebhookMsg] = useState<string>('Cần in gấp 2 tấm bạt Hiflex 20m x 5m căng bảng hiệu siêu thị, giao trong 24h.');
+  const [webhookResult, setWebhookResult] = useState<ExternalOrderResult | null>(null);
+
+  // Sync state helper
+  const refreshEnterpriseData = () => {
+    setApprovals(db.listApprovalCards());
+    setOrders(db.listOrders(50));
+    setDocuments(db.listDocuments(20));
+    setAutomationHistory(db.listAutomationRuns(10));
+    setDbStats(db.getStats());
+  };
+
+  const handleApprovalDecision = (id: string, decision: 'approved' | 'rejected' | 'revision_requested', note?: string) => {
+    const card = db.getApprovalCard(id);
+    if (!card) return;
+    const resolved = resolveApprovalCard(card, decision, 'Doraemon (Giám Đốc Điều Hành)', note);
+    db.saveApprovalCard(resolved);
+    if (resolved.orderId) {
+      db.updateOrderStatus(resolved.orderId, decision === 'approved' ? 'approved' : 'rejected');
+    }
+    refreshEnterpriseData();
+    setApprovalActionMsg(`Đã ${decision === 'approved' ? 'phê duyệt' : decision === 'rejected' ? 'từ chối' : 'yêu cầu sửa'} thẻ: ${card.title.slice(0, 35)}...`);
+    setTimeout(() => setApprovalActionMsg(''), 4500);
+  };
+
+  const handleTriggerAutomation = async (jobId: string) => {
+    setRunningJobId(jobId);
+    try {
+      await executeAutomationJob(jobId, sops, agents);
+      refreshEnterpriseData();
+      setAutomationJobs([...INITIAL_AUTOMATION_JOBS]);
+    } finally {
+      setRunningJobId(null);
+    }
+  };
+
+  const handleSimulateWebhook = () => {
+    const res = processExternalIncomingOrder(
+      {
+        source: webhookSource,
+        externalId: `${webhookSource}-${Date.now()}`,
+        senderName: webhookSender,
+        rawMessage: webhookMsg,
+        materialType: webhookMaterial,
+        widthMeters: webhookWidth,
+        heightMeters: webhookHeight,
+        quantity: webhookQty,
+        rushOrder: webhookRush,
+        requestedDiscountPercent: webhookDiscount
+      },
+      agents,
+      sops
+    );
+    setWebhookResult(res);
+    refreshEnterpriseData();
+  };
 
   const handleTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -403,6 +514,75 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Huấn luyện Quy chuẩn SOP ({sops.length})</span>
+              </button>
+
+              {/* TAB 5: APPROVAL GATE */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'approvals'}
+                onClick={() => setActiveTab('approvals')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'approvals'
+                    ? 'bg-amber-400 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+                <span>Cổng Phê Duyệt</span>
+                {approvals.filter((a) => a.status === 'pending').length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse">
+                    {approvals.filter((a) => a.status === 'pending').length}
+                  </span>
+                )}
+              </button>
+
+              {/* TAB 6: AUTOMATIONS */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'automations'}
+                onClick={() => setActiveTab('automations')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'automations'
+                    ? 'bg-amber-400 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-sky-400" />
+                <span>Tự Động Hóa ({automationJobs.length})</span>
+              </button>
+
+              {/* TAB 7: DATABASE & ORDERS */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'database'}
+                onClick={() => setActiveTab('database')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'database'
+                    ? 'bg-amber-400 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>CSDL SQLite ({orders.length})</span>
+              </button>
+
+              {/* TAB 8: EXTERNAL CHANNELS */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'channels'}
+                onClick={() => setActiveTab('channels')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeTab === 'channels'
+                    ? 'bg-amber-400 text-slate-950 font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 text-purple-400" />
+                <span>Kênh Ngoại Vi (Webhook)</span>
               </button>
             </div>
 
@@ -1512,6 +1692,628 @@ export const BottomControlDock: React.FC<BottomControlDockProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 5: APPROVAL GATE (CỔNG PHÊ DUYỆT KIỂM SOÁT RỦI RO) */}
+          {activeTab === 'approvals' && (
+            <div className="p-3.5 space-y-3 max-h-[270px] overflow-y-auto">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-rose-400" />
+                    <span>Cổng Phê Duyệt Ban Giám Đốc (Human-in-the-Loop Governance)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Cơ chế chặn rủi ro: Đơn hàng &gt;30M, chiết khấu &gt;15%, giao hỏa tốc hoặc hợp đồng pháp lý
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  {(['all', 'pending', 'approved', 'rejected'] as const).map((st) => {
+                    const count =
+                      st === 'all'
+                        ? approvals.length
+                        : approvals.filter((a) => a.status === st).length;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setApprovalFilter(st)}
+                        className={`px-2.5 py-1 text-[11px] rounded-md font-medium transition-colors cursor-pointer ${
+                          approvalFilter === st
+                            ? 'bg-amber-400 text-slate-950 font-bold'
+                            : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        {st === 'all'
+                          ? `Tất cả (${count})`
+                          : st === 'pending'
+                          ? `Chờ duyệt (${count})`
+                          : st === 'approved'
+                          ? `Đã duyệt (${count})`
+                          : `Từ chối (${count})`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {approvalActionMsg && (
+                <div className="p-2 bg-emerald-950/80 border border-emerald-500/60 rounded text-emerald-300 text-xs font-medium">
+                  ✓ {approvalActionMsg}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {approvals
+                  .filter((a) => (approvalFilter === 'all' ? true : a.status === approvalFilter))
+                  .map((card) => {
+                    const isPending = card.status === 'pending';
+                    const isApproved = card.status === 'approved';
+                    const isCritical = card.riskLevel === 'critical';
+                    const isHigh = card.riskLevel === 'high';
+
+                    return (
+                      <div
+                        key={card.id}
+                        className={`p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all ${
+                          isCritical
+                            ? 'bg-rose-950/20 border-rose-500/40'
+                            : isHigh
+                            ? 'bg-amber-950/20 border-amber-500/40'
+                            : 'bg-slate-900/80 border-slate-800'
+                        }`}
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-xs font-bold text-white leading-snug">
+                                {card.title}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                Đề xuất bởi:{' '}
+                                <strong className="text-slate-200">{card.agentName}</strong> · Cấp
+                                duyệt: <span className="text-purple-300">{card.requiredApprover}</span>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase shrink-0 border ${
+                                isCritical
+                                  ? 'bg-rose-950 text-rose-300 border-rose-700'
+                                  : isHigh
+                                  ? 'bg-amber-950 text-amber-300 border-amber-700'
+                                  : 'bg-slate-800 text-slate-300 border-slate-700'
+                              }`}
+                            >
+                              {card.riskLevel}
+                            </span>
+                          </div>
+
+                          <div className="p-2 bg-slate-950/70 border border-slate-800/80 rounded-lg text-[11px] space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Tổng giá trị đơn hàng:</span>
+                              <strong className="text-emerald-400 text-xs font-bold">
+                                {card.details.totalAmountFormatted}
+                              </strong>
+                            </div>
+                            {card.details.customerName && (
+                              <div className="flex justify-between items-center text-slate-300">
+                                <span className="text-slate-400">Khách hàng:</span>
+                                <span>{card.details.customerName}</span>
+                              </div>
+                            )}
+                            <div className="text-slate-300 text-[10px] pt-0.5">
+                              {card.details.productSummary}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold text-amber-300">
+                              Yếu tố kích hoạt cổng phê duyệt ({card.triggers.length}):
+                            </div>
+                            <ul className="space-y-0.5 text-[10px] text-slate-300">
+                              {card.triggers.map((trig, idx) => (
+                                <li key={idx} className="flex items-start gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                                  <span>{trig}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {/* Card Footer Actions */}
+                        <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                          {isPending ? (
+                            <div className="flex items-center gap-1.5 w-full">
+                              <button
+                                type="button"
+                                onClick={() => handleApprovalDecision(card.id, 'approved')}
+                                className="flex-1 py-1 px-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded cursor-pointer transition-colors text-center"
+                              >
+                                ✓ Phê duyệt
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleApprovalDecision(
+                                    card.id,
+                                    'revision_requested',
+                                    'Yêu cầu đàm phán giảm mức chiết khấu xuống ≤ 15%'
+                                  )
+                                }
+                                className="py-1 px-2 text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded cursor-pointer transition-colors"
+                              >
+                                Yêu cầu sửa
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleApprovalDecision(card.id, 'rejected', 'Từ chối do rủi ro tài chính')
+                                }
+                                className="py-1 px-2 text-xs font-medium bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded cursor-pointer transition-colors"
+                              >
+                                Từ chối
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-full flex items-center justify-between text-[11px]">
+                              <span
+                                className={`font-semibold ${
+                                  isApproved ? 'text-emerald-400' : 'text-rose-400'
+                                }`}
+                              >
+                                {isApproved ? '✓ Đã phê duyệt' : '✕ Đã từ chối'} bởi{' '}
+                                {card.reviewedBy || 'Doraemon'}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[10px]">
+                                {card.reviewedAt ? new Date(card.reviewedAt).toLocaleTimeString('vi-VN') : ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: AUTOMATIONS (BỘ LẬP LỊCH ĐỊNH KỲ DOANH NGHIỆP) */}
+          {activeTab === 'automations' && (
+            <div className="p-3.5 space-y-3 max-h-[270px] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div>
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-sky-400" />
+                    <span>Bộ Lập Lịch Định Kỳ & Giám Sát Doanh Nghiệp (Cron Automations)</span>
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Tự động vận hành theo quy chuẩn SOP mà không cần người dùng nhập lệnh thủ công
+                  </p>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  Tổng lượt chạy: <strong className="text-amber-400">{dbStats.totalAutomationsRun}</strong>
+                </div>
+              </div>
+
+              {/* 4 Predefined Jobs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {automationJobs.map((job) => {
+                  const isRunning = runningJobId === job.id;
+                  return (
+                    <div
+                      key={job.id}
+                      className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col justify-between gap-2"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded">
+                            {job.code}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">{job.cronSchedule}</span>
+                        </div>
+                        <div className="text-xs font-bold text-white leading-tight">{job.title}</div>
+                        <div className="text-[11px] text-slate-400 leading-relaxed">
+                          Phụ trách: <strong className="text-slate-200">{job.assignedAgentName}</strong>
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-3">{job.description}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span>Đã chạy: {job.runCount} lần</span>
+                          <span className="text-emerald-400">
+                            {job.lastStatus === 'success' ? '● Đạt chuẩn' : '● Sẵn sàng'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => handleTriggerAutomation(job.id)}
+                          className="w-full py-1 px-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span>{isRunning ? 'Đang chạy...' : 'Chạy ngay (Trigger)'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Recent History Table */}
+              {automationHistory.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-xs font-semibold text-slate-300">
+                    Nhật ký các lần kích hoạt tự động gần nhất:
+                  </div>
+                  <div className="border border-slate-800 rounded-lg overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                          <th className="py-1 px-2.5">Thời gian</th>
+                          <th className="py-1 px-2.5">Tác vụ tự động</th>
+                          <th className="py-1 px-2.5">Kết quả báo cáo</th>
+                          <th className="py-1 px-2.5 text-right">Thời gian chạy</th>
+                          <th className="py-1 px-2.5 text-right">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {automationHistory.slice(0, 5).map((log) => (
+                          <tr key={log.id} className="border-b border-slate-800/60 text-slate-300">
+                            <td className="py-1 px-2.5 font-mono text-[10px] text-slate-400">
+                              {new Date(log.executedAt).toLocaleTimeString('vi-VN')}
+                            </td>
+                            <td className="py-1 px-2.5 font-medium text-white">{log.title}</td>
+                            <td className="py-1 px-2.5 text-slate-300 truncate max-w-xs">
+                              {log.reportHeadline}
+                            </td>
+                            <td className="py-1 px-2.5 text-right font-mono text-slate-400">
+                              {log.durationMs}ms
+                            </td>
+                            <td className="py-1 px-2.5 text-right">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                Thành công
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 7: DATABASE & ORDERS (CSDL DOANH NGHIỆP SQLITE) */}
+          {activeTab === 'database' && (
+            <div className="p-3.5 space-y-3 max-h-[270px] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span className="font-bold text-white text-xs">
+                    Cơ Sở Dữ Liệu Doanh Nghiệp SQLite (Embedded Enterprise DB)
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Lưu trữ hợp đồng, đơn hàng PO, báo giá và lịch sử phê duyệt
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshEnterpriseData}
+                  className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Làm mới dữ liệu</span>
+                </button>
+              </div>
+
+              {/* Metrics Strip */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                  <div className="text-[10px] text-slate-400">Tổng Đơn Hàng (PO)</div>
+                  <div className="text-base font-bold text-white">{dbStats.totalOrders} đơn</div>
+                </div>
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                  <div className="text-[10px] text-slate-400">Doanh Thu Lũy Kế</div>
+                  <div className="text-base font-bold text-emerald-400">{formatVnd(dbStats.totalRevenueVnd)}</div>
+                </div>
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                  <div className="text-[10px] text-slate-400">Đơn Chờ CEO Duyệt</div>
+                  <div className="text-base font-bold text-rose-400">{dbStats.pendingApprovals} đơn</div>
+                </div>
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                  <div className="text-[10px] text-slate-400">Văn Bản & Hợp Đồng</div>
+                  <div className="text-base font-bold text-purple-400">{dbStats.totalDocuments} tài liệu</div>
+                </div>
+              </div>
+
+              {/* Orders Table */}
+              <div className="border border-slate-800 rounded-lg overflow-x-auto">
+                <table className="w-full text-left border-collapse text-[11px]">
+                  <thead>
+                    <tr className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                      <th className="py-1.5 px-2.5">Mã PO</th>
+                      <th className="py-1.5 px-2.5">Khách hàng</th>
+                      <th className="py-1.5 px-2.5">Sản phẩm & Quy cách</th>
+                      <th className="py-1.5 px-2.5 text-right">Khối lượng</th>
+                      <th className="py-1.5 px-2.5 text-right">Thành tiền (VAT)</th>
+                      <th className="py-1.5 px-2.5 text-center">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => (
+                      <tr key={o.id} className="border-b border-slate-800/60 text-slate-300">
+                        <td className="py-1.5 px-2.5 font-mono text-amber-300 font-bold">{o.id}</td>
+                        <td className="py-1.5 px-2.5 font-medium text-white">{o.customerName}</td>
+                        <td className="py-1.5 px-2.5 text-slate-400 truncate max-w-xs">{o.specsSummary}</td>
+                        <td className="py-1.5 px-2.5 text-right font-mono">{o.quantity}</td>
+                        <td className="py-1.5 px-2.5 text-right font-bold text-emerald-400">
+                          {formatVnd(o.grandTotalVnd)}
+                        </td>
+                        <td className="py-1.5 px-2.5 text-center">
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded font-medium border ${
+                              o.status === 'approved'
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                                : o.status === 'pending_approval'
+                                ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                : 'bg-slate-800 text-slate-300 border-slate-700'
+                            }`}
+                          >
+                            {o.status === 'approved'
+                              ? 'Đã duyệt'
+                              : o.status === 'pending_approval'
+                              ? 'Chờ duyệt'
+                              : 'Hoàn thành'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Documents List */}
+              {documents.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-semibold text-slate-300">
+                    Kho Văn Bản Hành Chính & Hợp Đồng B2B ({documents.length}):
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {documents.map((d) => (
+                      <div
+                        key={d.id}
+                        className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between gap-2"
+                      >
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-amber-300 truncate">{d.title}</div>
+                          <div className="text-[10px] text-slate-400">
+                            Số: <span className="font-mono text-slate-300">{d.documentNumber}</span> · Căn cứ:{' '}
+                            {d.legalBasis}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(d.content);
+                            alert(`Đã sao chép văn bản "${d.title}" vào bộ nhớ tạm!`);
+                          }}
+                          className="px-2 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded whitespace-nowrap cursor-pointer shrink-0"
+                        >
+                          📋 Sao chép
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 8: EXTERNAL CHANNELS / WEBHOOK SIMULATOR */}
+          {activeTab === 'channels' && (
+            <div className="p-3.5 grid grid-cols-1 md:grid-cols-12 gap-3.5 max-h-[270px] overflow-y-auto">
+              {/* Left Column: Webhook Simulator Form */}
+              <div className="md:col-span-5 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <Radio className="w-4 h-4 text-purple-400" />
+                    <span>Cổng Tiếp Nhận Đơn Hàng Ngoại Vi (Webhook)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Telegram / Zalo OA / Form</span>
+                </div>
+
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl space-y-2 text-xs">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWebhookSource('telegram')}
+                      className={`py-1 text-xs font-bold rounded cursor-pointer transition-colors ${
+                        webhookSource === 'telegram'
+                          ? 'bg-sky-500 text-slate-950'
+                          : 'bg-slate-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Telegram Bot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWebhookSource('zalo')}
+                      className={`py-1 text-xs font-bold rounded cursor-pointer transition-colors ${
+                        webhookSource === 'zalo'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Zalo OA
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWebhookSource('web_portal')}
+                      className={`py-1 text-xs font-bold rounded cursor-pointer transition-colors ${
+                        webhookSource === 'web_portal'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-slate-950 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Web Form
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Tên khách hàng / Đối tác</label>
+                      <input
+                        type="text"
+                        value={webhookSender}
+                        onChange={(e) => setWebhookSender(e.target.value)}
+                        className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Vật liệu</label>
+                        <select
+                          value={webhookMaterial}
+                          onChange={(e) => setWebhookMaterial(e.target.value)}
+                          className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white"
+                        >
+                          <option value="hiflex">Bạt Hiflex</option>
+                          <option value="decal_pp">Decal PP</option>
+                          <option value="standee">Standee</option>
+                          <option value="catalogue">Catalogue</option>
+                          <option value="flyer">Tờ rơi Offset</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Kích thước (m)</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={webhookWidth}
+                            onChange={(e) => setWebhookWidth(Number(e.target.value))}
+                            className="w-full px-1.5 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white text-center"
+                          />
+                          <span className="text-slate-500">x</span>
+                          <input
+                            type="number"
+                            value={webhookHeight}
+                            onChange={(e) => setWebhookHeight(Number(e.target.value))}
+                            className="w-full px-1.5 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white text-center"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-0.5">Số lượng</label>
+                        <input
+                          type="number"
+                          value={webhookQty}
+                          onChange={(e) => setWebhookQty(Number(e.target.value))}
+                          className="w-full px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-white text-center"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={webhookRush}
+                          onChange={(e) => setWebhookRush(e.target.checked)}
+                          className="accent-amber-400"
+                        />
+                        <span>Giao hỏa tốc (&lt;24h)</span>
+                      </label>
+
+                      <div className="flex items-center gap-1">
+                        <span className="text-slate-400 text-[10px]">Chiết khấu:</span>
+                        <input
+                          type="number"
+                          value={webhookDiscount}
+                          onChange={(e) => setWebhookDiscount(Number(e.target.value))}
+                          className="w-12 px-1 py-0.5 bg-slate-950 border border-slate-700 rounded text-xs text-amber-300 text-center font-bold"
+                        />
+                        <span className="text-slate-400 text-[10px]">%</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSimulateWebhook}
+                      className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-lg"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Gửi Đơn Vào Văn Phòng 3D (Simulate Webhook)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Webhook Response Viewer */}
+              <div className="md:col-span-7 bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Phản Hồi Thời Gian Thực Của Trợ Lý AI Về Kênh Chat</span>
+                  </span>
+                  {webhookResult && (
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                      Mã PO: {webhookResult.orderId}
+                    </span>
+                  )}
+                </div>
+
+                {webhookResult ? (
+                  <div className="space-y-2 overflow-y-auto max-h-[190px] pr-1">
+                    <div className="flex items-center justify-between p-2 bg-slate-950 rounded-lg text-[11px]">
+                      <div>
+                        <span className="text-slate-400">Trợ lý phụ trách: </span>
+                        <strong className="text-sky-300">{webhookResult.assignedAgentName}</strong> (
+                        {webhookResult.assignedDepartment})
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-400">Tổng giá trị: </span>
+                        <strong className="text-emerald-400 text-xs">
+                          {webhookResult.totalAmountFormatted}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {webhookResult.requiresApproval && (
+                      <div className="p-2 bg-rose-950/40 border border-rose-500/50 rounded-lg text-[11px] text-rose-300 flex items-start gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Đã tự động đẩy vào [CỔNG PHÊ DUYỆT BAN GIÁM ĐỐC]:</strong> Đơn hàng
+                          có giá trị lớn hoặc yêu cầu hỏa tốc. Bạn có thể sang tab{' '}
+                          <strong className="text-white">"Cổng Phê Duyệt"</strong> để duyệt đơn!
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-slate-400 font-semibold">
+                        Nội dung phản hồi tự động gửi cho khách hàng qua {webhookSource.toUpperCase()}:
+                      </div>
+                      <pre className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {webhookResult.botResponseMessage}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                    <Radio className="w-8 h-8 mb-2 opacity-40 text-purple-400" />
+                    <p className="text-xs">
+                      Điền thông số bên trái và bấm <strong>"Gửi Đơn Vào Văn Phòng 3D"</strong> để mô phỏng
+                      luồng khách gửi đơn qua Telegram / Zalo OA.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

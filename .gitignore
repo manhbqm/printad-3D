@@ -10,3 +10,5 @@ coverage/
 .playwright-cli/
 public/assets/aistudio/
 
+*.sqlite
+data/
